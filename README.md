@@ -1,4 +1,4 @@
-#Welcome to the Gargle Scraper
+# Welcome to the Gargle Scraper
 This program spent a decade as a "project to get around to" in my head, and then Q4 2022 rolled around and Twitter appeared signifigantly less survivable than it had in all previous years.  That got me off my butt, and here we are.  An actual scraper!
 
 
