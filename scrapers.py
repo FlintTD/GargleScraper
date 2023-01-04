@@ -81,6 +81,7 @@ class TwitterScraper():
         media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
         media.screenshot("/Logs/tweet.png")
         
+        # Try to find an image in the tweet.
         try:
             image = media.find_element(By.XPATH, ".//div[@aria-label='Image']")
         except NoSuchElementException:
@@ -88,7 +89,8 @@ class TwitterScraper():
             pass
         else:
             return "image"
-        
+            
+        # Try to find a video in the tweet.
         try:
             video = media.find_element(By.XPATH, ".//div[@aria-label='Embedded video']")
         except NoSuchElementException:
@@ -97,6 +99,7 @@ class TwitterScraper():
         else:
             return "video"
         
+        # Try to find text in the tweet.
         try:
             text = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
         except NoSuchElementException:
@@ -109,7 +112,7 @@ class TwitterScraper():
         try:
             # Locate the text in Twitter.
             media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
-            textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
+            textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
             text = textblock.find_element(By.TAG_NAME, 'span').text
             # Save the text.
             print(text)

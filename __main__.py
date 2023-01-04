@@ -20,7 +20,7 @@ def sanitizeEmailBody(emailBody):
 
 def whichPlatformIsUrl(url):
     # Identify which scraper to use for this URL.
-    regexTwitter = r"(https?://[^\s]*twitter.com[^\s]*)"
+    regexTwitter = r"(https?://[^\s]*twitter.com[^\s]*)" # Works for https://www.twitter.com and https://twitter.com
     regexShortTwitter = r"(https?://t.co[^\s]+)"
     regexDeviantart = r"(https?://[^\s]+deviantart.com[^\s]*)"
     
