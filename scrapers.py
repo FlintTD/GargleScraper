@@ -33,11 +33,12 @@ class TwitterScraper():
         # Check if logging in is necessary.
         homeHeading = None
         try:
-            # Check if we are already at Twitter Home.
-            homeHeading = self.wait.until(EC.presence_of_element_located((By.LINK_TEXT, "Home")))
+            # Check if we are already logged in
+            # Does the web page have an Account button?
+            accountButton = self.wait.until(EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Account menu']")))
         finally:
             # If Home header isn't found, logging in is necessary.
-            if homeHeading is None:
+            if accountButton is None:
                 # To log in, first navigate to the Twitter login page.
                 self.driver.get("http://www.twitter.com/login")
                 # Wait until the Login page loads.
@@ -72,10 +73,48 @@ class TwitterScraper():
     
     def goToPage(self, url):
         self.driver.get(str(url))
-        self.wait.until(EC.visibility_of_element_located((By.ROLE, "heading")))
+        self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, "main")))
         time.sleep(1)
     
-    def assessAndDownloadPage(self):
+    def analyzePageMedia(self):
+        # Determine what kind of media is present on the currently-open page.
+        media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
+        media.screenshot("/Logs/tweet.png")
+        
+        try:
+            image = media.find_element(By.XPATH, ".//div[@aria-label='Image']")
+        except NoSuchElementException:
+            #print("Not an image!")
+            pass
+        else:
+            return "image"
+        
+        try:
+            video = media.find_element(By.XPATH, ".//div[@aria-label='Embedded video']")
+        except NoSuchElementException:
+            #print("Not a video!")
+            pass
+        else:
+            return "video"
+        
+        try:
+            text = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
+        except NoSuchElementException:
+            #print("Not text!")
+            pass
+        else:
+            return "text"
+    
+    def downloadText(self):
+        try:
+            # Locate the text in Twitter.
+            media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
+            textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
+            text = textblock.find_element(By.TAG_NAME, 'span').text
+            # Save the text.
+            print(text)
+        except NoSuchElementException:
+            print("Error downloading text from Twitter!")
         
 
 
