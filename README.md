@@ -62,11 +62,16 @@ This guide will: use Google Cloud to generate Google secrets, enable the Gmail A
 ## Using the Gargle Scraper
 Once the Gargle Scraper has been set up on your computer, it can be commanded to scrape information in various ways.  The Gargle Scraper was intended to be used via command line.
 
+To invoke the Gargle Scaper, type navigate to the Gargle Scraper's directory and type "`python __main__.py <commands>`".
+
 ### Commands
 **-h**, or **--help**: Prints some help text to the terminal.
+
 **-u**, or **--url**: Scrapes a single post from a single URL.
+
 **g**, or **--gmail**: Scrapes ALL posts contained in emails with a specific Label in your Gmail server.
 
 ### Unimplemented Commands
 **-l**, or **--list**: Scrapes all posts from a provided list file. (CSV?)
+
 **-o**, or **--overwrite**: Modifier which will cause the scaper to overwrite any posts found to be already downloaded.
