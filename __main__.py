@@ -34,31 +34,40 @@ def whichPlatformIsUrl(url):
         return None
 
 def scrapeFromTwitter(url, twitter_scraper):
-    # Use the Twitter Scraper.
+    # Navigate to the requested page on Twitter.
     twitter_scraper.goToPage(url)
+    # Determine the type of media the post contains.
     mediaType = twitter_scraper.analyzePageMedia()
-    print(mediaType)
+    # Attempt to download the post.
     if mediaType == "text":
-        twitter_scraper.downloadText()
+        return twitter_scraper.downloadText(url)
+    elif mediaType == "image":
+        print("Image media from Twitter is not yet supported!")
+        return False
+    elif mediaType == "video":
+        print("Video media from Twitter is not yet supported!")
+        return False
+    else:
+        return False
     
 #def scrapeFromDeviantart: 
     # Use the DeviantArt Scraper.
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hl:g:",["help","link=","gmail="])
+    opts, args = getopt.getopt(argv,"hu:g:",["help","url=","gmail="])
     
     for opt, arg in opts:
     
         if opt in ('-h', '--help'):
             # Print out the help text.
-            print('__main__.py -l <link to media>')
+            print('__main__.py -u <URL to media>')
             print('__main__.py -g')
             
             # Exit the Gargle Scraper.
             sys.exit()
         
-        elif opt in ('-l', '--link'):
+        elif opt in ('-u', '--url'):
             # Determine which platform the link is for.
             platform = whichPlatformIsUrl(arg)
             if platform == "twitter":
@@ -76,6 +85,10 @@ def main(argv):
                 
                 # Cleanup.
                 twitter_scraper.teardown()
+            else:
+                # Skip archiving if the site has no scraper.
+                logger.log(url, "SKIPPED", "Website has no associated scraper.")
+            
             # Exit the Gargle Scraper.
             sys.exit()
         
@@ -119,13 +132,23 @@ def main(argv):
                 if emailBody is not None:
                     urls = sanitizeEmailBody(emailBody)
                     for url in urls:
-                        scrapeFromUrl(url)
+                        # For each URL, attempt scraping and archiving.
+                        platform = whichPlatformIsUrl(url)
+                        if platform == "twitter":
+                            success = scrapeFromTwitter(url, twitter_scraper)
+                            if not success:
+                                logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                        else:
+                            logger.log(url, "SKIPPED", "Website has no associated scraper.")
             
             # Cleanup
             twitter_scraper.teardown()
         
             # Exit the Gargle Scraper.
             sys.exit()
+    
+    # Exit the Gargle Scraper once the main function is complete, even if no other exit conditions are met.
+    sys.exit()
 
 if __name__ == "__main__":
    main(sys.argv[1:])

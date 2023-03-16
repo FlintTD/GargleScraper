@@ -8,6 +8,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 import time
 import os
+import json
+from datetime import datetime
 
 class TwitterScraper():
     
@@ -15,6 +17,9 @@ class TwitterScraper():
         self.email = email
         self.username = username
         self.password = password
+        self.working_dir = os.path.dirname(__file__)
+        self.relative_path_to_archive = "Archive"
+        self.path_to_archive = os.path.join(self.working_dir, self.relative_path_to_archive)
         chrome_options = Options()
         chrome_options.add_argument(f"user-data-dir={os.path.join(os.path.dirname(__file__), '/CustomChromeProfile')}")
         self.driver = webdriver.Chrome(
@@ -78,6 +83,7 @@ class TwitterScraper():
     
     def analyzePageMedia(self):
         # Determine what kind of media is present on the currently-open page.
+        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//article[@data-testid='tweet']")))
         media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
         media.screenshot("/Logs/tweet.png")
         
@@ -108,16 +114,69 @@ class TwitterScraper():
         else:
             return "text"
     
-    def downloadText(self):
+    # Returns a Boolean, String, JSON.
+    #   Boolean represents whether the download succeeded.
+    #   String is the downloaded text, or None if download failed.
+    #   JSON is the post metadata, or None if download failed.
+    def downloadText(self, url):
         try:
             # Locate the text in Twitter.
             media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
             textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
             text = textblock.find_element(By.TAG_NAME, 'span').text
-            # Save the text.
-            print(text)
-        except NoSuchElementException:
+            
+            # Retrieve the post's metadata.
+            metadata = {}
+            metadata["post type"] = "text"
+            
+            # Retrieve the author handle.
+            author_names = media.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+            author = author_names.find_element(By.TAG_NAME, "a").get_attribute("href")
+            metadata["author"] = author.replace("https://twitter.com/", "@")
+            
+            # Retrieve the time the tweet was posted.
+            timestring = media.find_element(By.TAG_NAME, 'time').get_attribute("datetime")
+            datetime_obj = datetime.fromisoformat(timestring)
+            metadata["date"] = datetime_obj
+            
+            # Record the time the tweet was scraped.
+            metadata["time of scrape"] = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+            
+            # Record the URL the scraper was given.
+            metadata["url"] = str(url)
+            
+            # Try to download the post.
+            datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+            dirname = datestring + "__" + text.replace(" ", "")[0:16]
+            path_to_download_dir = os.path.join(self.path_to_archive, dirname)
+            
+            # If the directory already exists, the post has already been downloaded.
+            if os.path.exists(path_to_download_dir):
+                # Skip downloading this post.
+                print("This text post from Twitter has already been downloaded!")
+                return(True)
+            else:
+                # Download this post.
+                os.makedirs(path_to_download_dir)
+                filename = datestring + ".txt"
+                with open(os.path.join(path_to_download_dir, filename), 'w') as file:
+                    file.write(text)
+                
+                # Try to save the metadata.
+                metadata_filename = datestring + "__" + "metadata" + ".json"
+                metadata["date"] = metadata["date"].strftime('%Y-%m-%d, %HH:%MM:%SS')
+                json_metadata = json.dumps(metadata)
+                with open(os.path.join(path_to_download_dir, metadata_filename), 'w') as file:
+                    file.write(json_metadata)
+            
+                # Return a success.
+                return(True)
+        
+        except NoSuchElementException as e:
             print("Error downloading text from Twitter!")
+            print(e)
+            # Return a failure.
+            return(False)
         
 
 

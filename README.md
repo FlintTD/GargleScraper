@@ -9,7 +9,6 @@ Specifically, the scraper goes through all of the emails with a specific Gmail L
 
 
 ## Description
-
 The Gargle Scaper is a program which runs locally on a computer.  It was made entirely in Python.  It was coded with the expectation of running in a non-virtualized Windows 10 environment, and serving a single user.
 
 
@@ -24,7 +23,7 @@ Python virtual environment or not, you will need to download the required Python
 
 In order to get this program up and running, you will need to install Google Chrome onto your computer, and also download the appropriate version of [Chromedriver](https://chromedriver.chromium.org/downloads).  The appropriate version of Chromedriver is whichever version matches the version of Chrome you have installed.  When you download *chromedriver.exe*, put it in the directory: *GargleScraper/*.
 
-Lastly, you will need to provide the GargleScraper with a bunch of login information.  That information will live in the *GargleScraper/Credentials* directory.
+Lastly, you will need to provide the Gargle Scraper with a bunch of login information.  That information will live in the *GargleScraper/Credentials* directory.
 
 
 ### The information you need is:
@@ -60,3 +59,14 @@ This guide will: use Google Cloud to generate Google secrets, enable the Gmail A
 15. A pop-up will appear, bearing the name of your Google Cloud application, and displaying a Client ID and Client Secret.  In this pop-up, click the **Download JSON** button.  Save this file as "google_secrets.json", and save it to the *GargleScraper/Credentials* directory.
 
 
+## Using the Gargle Scraper
+Once the Gargle Scraper has been set up on your computer, it can be commanded to scrape information in various ways.  The Gargle Scraper was intended to be used via command line.
+
+### Commands
+**-h**, or **--help**: Prints some help text to the terminal.
+**-u**, or **--url**: Scrapes a single post from a single URL.
+**g**, or **--gmail**: Scrapes ALL posts contained in emails with a specific Label in your Gmail server.
+
+### Unimplemented Commands
+**-l**, or **--list**: Scrapes all posts from a provided list file. (CSV?)
+**-o**, or **--overwrite**: Modifier which will cause the scaper to overwrite any posts found to be already downloaded.
