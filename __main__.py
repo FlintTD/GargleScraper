@@ -42,7 +42,7 @@ def scrapeFromTwitter(url, twitter_scraper):
     if mediaType == "text":
         return twitter_scraper.downloadText(url)
     elif mediaType == "image":
-        print("Image media from Twitter is not yet supported!")
+        return twitter_scraper.downloadImage(url)
         return False
     elif mediaType == "video":
         print("Video media from Twitter is not yet supported!")
