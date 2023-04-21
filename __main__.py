@@ -40,13 +40,14 @@ def scrapeFromTwitter(url, twitter_scraper):
     mediaType = twitter_scraper.analyzePageMedia()
     # Attempt to download the post.
     if mediaType == "text":
+        print("  Text post!")
         return twitter_scraper.downloadText(url)
     elif mediaType == "image":
+        print("  Image post!")
         return twitter_scraper.downloadImage(url)
-        return False
     elif mediaType == "video":
-        print("Video media from Twitter is not yet supported!")
-        return False
+        print("  Video post!")
+        return twitter_scraper.downloadVideo(url)
     else:
         return False
     
@@ -84,12 +85,14 @@ def main(argv):
                 scrapeFromTwitter(arg, twitter_scraper)
                 
                 # Cleanup.
+                print("  Twitter scraper module deactivating...")
                 twitter_scraper.teardown()
             else:
                 # Skip archiving if the site has no scraper.
                 logger.log(url, "SKIPPED", "Website has no associated scraper.")
             
             # Exit the Gargle Scraper.
+            print("Gargle Scraper is now closing...")
             sys.exit()
         
         elif opt in ('g', '--gmail'):
@@ -123,7 +126,7 @@ def main(argv):
             #     If the content is not available, mark the email as Read (and flag it Red somehow).
             #   Move on to the next email.
             if not unread_message_ids:
-                print("No unread messages found!")
+                print("  No unread messages found!")
             else:
                 #for id in unread_message_ids:
                 email = gmail_account.getEmailFromMessageId(unread_message_ids[0])
@@ -145,9 +148,11 @@ def main(argv):
             twitter_scraper.teardown()
         
             # Exit the Gargle Scraper.
+            print("  Gargle Scraper is now closing...")
             sys.exit()
     
     # Exit the Gargle Scraper once the main function is complete, even if no other exit conditions are met.
+    print("  Gargle Scraper is now closing...")
     sys.exit()
 
 if __name__ == "__main__":
