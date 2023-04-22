@@ -29,7 +29,7 @@ class TwitterScraper():
         self.relative_path_to_archive = "Archive"
         self.path_to_archive = os.path.join(self.working_dir, self.relative_path_to_archive)
         chrome_options = Options()
-        chrome_options.add_argument(f"user-data-dir={os.path.join(os.path.dirname(__file__), '/CustomChromeProfile')}")
+        chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
         self.driver = webdriver.Chrome(
             executable_path = os.path.join(os.getcwd(), 'chromedriver'),
             options = chrome_options
@@ -82,6 +82,7 @@ class TwitterScraper():
         time.sleep(1)
     
     def teardown(self):
+        print("  Twitter scraper module deactivating...")
         self.driver.close()
     
     def goToPage(self, url):
