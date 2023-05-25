@@ -38,24 +38,6 @@ def whichPlatformIsUrl(url):
         return "deviantart"
     else:
         return None
-
-def scrapeFromTwitter(url, twitter_scraper):
-    # Navigate to the requested page on Twitter.
-    twitter_scraper.goToPage(url)
-    # Determine the type of media the post contains.
-    mediaType = twitter_scraper.analyzePageMedia()
-    # Attempt to download the post.
-    if mediaType == "text":
-        print("  Text post!")
-        return twitter_scraper.downloadText(url)
-    elif mediaType == "image":
-        print("  Image post!")
-        return twitter_scraper.downloadImage(url)
-    elif mediaType == "video":
-        print("  Video post!")
-        return twitter_scraper.downloadVideo(url)
-    else:
-        return False
     
 #def scrapeFromDeviantart: 
     # Use the DeviantArt Scraper.
@@ -130,7 +112,7 @@ def main(argv):
         platform = whichPlatformIsUrl(url)
         if platform == "twitter":
             if ACTIVE_PLATFORMS[platform] is True:
-                success = scrapeFromTwitter(url, twitter_scraper)
+                success = twitter_scraper.scrapeFromTwitter(url)
                 if not success:
                     logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
             else:
@@ -144,7 +126,7 @@ def main(argv):
                                     )
                 twitter_scraper.login()
                 # Scrape the Twitter post.
-                success = scrapeFromTwitter(url, twitter_scraper)
+                success = twitter_scraper.scrapeFromTwitter(url)
                 if not success:
                     logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
         else:

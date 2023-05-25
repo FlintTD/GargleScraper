@@ -90,10 +90,30 @@ class TwitterScraper():
         self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, "main")))
         time.sleep(1)
     
-    def analyzePageMedia(self):
-        # Determine what kind of media is present on the currently-open page.
-        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//article[@data-testid='tweet']")))
-        media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
+    def screenshot(self, element, dir_path, screenshot_name):
+        try:
+            ActionChains(self.driver).scroll_to_element(element).perform()  # focus
+            location = element.location
+            print(location)
+            size = element.size
+            self.wait.until(EC.visibility_of(element))
+            png = self.driver.get_screenshot_as_png()
+            im = Image.open(io.BytesIO(png))
+            left = location['x']
+            top = location['y'] - self.driver.execute_script('return window.pageYOffset;')
+            right = left + size['width']
+            bottom = top + size['height']
+            im = im.crop((left, top, right, bottom))
+            with open(os.path.join(dir_path, screenshot_name + ".png"), 'wb') as file:
+                im.save(file, "png")
+        except Exception as e:
+            print("Error taking screenshot of web element!")
+            print(e)
+            
+    
+    # Determine what kind of media is present on the currently-open page.
+    # Arguements: media is a Selenium driver element pointing to a specific Tweet in a page and Thread.
+    def analyzePageMedia(self, media):
         media.screenshot("/Logs/tweet.png")
         
         # Try to find a video in the tweet first.
@@ -123,24 +143,88 @@ class TwitterScraper():
         else:
             return "text"
     
-    # Retrieves the metadata of a post, when that post is already open in the webdriver.
+    # Look at the loaded Twitter page, and pick out the relevant Tweets from a Thread.
+    # Returns a List of individual Tweets.
+    def analyzeThread(self):
+        # Wait for the conversation on the page to fully load.
+        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Timeline: Conversation']")))
+        
+        # Find the full "conversation" thread (e.g. tweet + comments + previous tweets).
+        conversation = self.driver.find_element(By.XPATH, "//div[@aria-label='Timeline: Conversation']")
+        # Create a list of all present tweets in the conversation (original + previous + comments).
+        present_tweets = conversation.find_elements(By.XPATH, ".//article[@data-testid='tweet'][@role='article']")
+        
+        # Iterate over all tweets in the thread for analysis.
+        past_base_tweet = False
+        base_tweet_author_link = ""
+        thread_segment_to_download = []
+        base_tweet = False  # Will be a web element (if it is found).
+        i = 0
+        for tweet in present_tweets:
+            i += 1
+            print(i)
+            # Check if this Tweet is the Thread's base Tweet.
+            is_base_tweet = str(tweet.get_attribute("tabindex"))
+            if is_base_tweet == "0":  #not the base tweet...
+                if past_base_tweet == False:
+                    # Add the tweet to the List of tweets to download (the "thread segment".)
+                    thread_segment_to_download.append(tweet)
+                else:
+                    # Check if the tweet author is the same as the base tweet's author.
+                    username_block = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+                    author_link = username_block.find_element(By.XPATH, ".//a").get_attribute("href")
+                    if author_link == base_tweet_author_link:
+                        # Add the author's additional tweet to the List of tweets to download (the "thread segment").
+                        thread_segment_to_download.append(tweet)
+                    else:
+                        # Don't add a separate person's tweet.
+                        return thread_segment_to_download, base_tweet
+                        #return thread_segment_to_download, base_tweet
+            elif is_base_tweet == "-1":  #the base tweet!
+                print("Base Tweet found!")
+                if past_base_tweet == False:
+                    # Record that this is the base tweet, and move on.
+                    username_block = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+                    author_link = username_block.find_element(By.XPATH, ".//a").get_attribute("href")
+                    base_tweet_author_link = author_link
+                    thread_segment_to_download.append(tweet)
+                    base_tweet = tweet
+                    past_base_tweet = True
+                else:
+                    # This should never occur.
+                    raise TypeError("Two base tweets found in a Twitter thread, but there should only be one!")
+            else:
+                # This should never occur.
+                raise TypeError("Third type of tweet found in a Twitter thread (not 'base' or 'other')!")
+        
+        return thread_segment_to_download, base_tweet
+    
+    # Retrieves the metadata of a Tweet, when that Tweet is already open in the webdriver.
     # Returns a dictionary of metadata, if successful.
-    def scrapeMetadata(self):
+    def scrapeMetadata(self, tweet, url):
         metadata = {}
         
         try:
-            # Locate the tweet in the Twitter webpage.
-            media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
-            
-            # Retrieve the author handle.
-            author_names = media.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+            # Record the author's handle.
+            author_names = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
             author = author_names.find_element(By.TAG_NAME, "a").get_attribute("href")
             metadata["author"] = author.replace("https://twitter.com/", "@")
             
-            # Retrieve the time the tweet was posted.
-            timestring = media.find_element(By.TAG_NAME, 'time').get_attribute("datetime")
+            # Record the time the Tweet was posted.
+            timestring = tweet.find_element(By.TAG_NAME, 'time').get_attribute("datetime")
             datetime_obj = datetime.fromisoformat(timestring)
             metadata["date"] = datetime_obj
+            
+            # Record whether this Tweet is the base Tweet.
+            is_base_tweet = str(tweet.get_attribute("tabindex"))
+            if is_base_tweet == "-1":
+                # Record this as the base tweet.
+                metadata["base_tweet"] = True
+                # Record the URL the scraper was given.
+                metadata["url"] = str(url)
+            else:
+                # Record this is not the base tweet.
+                metadata["base_tweet"] = False
             
             # Record the time the tweet was scraped.
             metadata["time of scrape"] = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -153,28 +237,49 @@ class TwitterScraper():
         # Return a success.
         return(metadata)
     
-    # Retrieves the metadata of a post, when that post is already open in the webdriver.
+    # Generates a directory path for containing the data from a Thread or single Tweet.
+    def generatePostDirectoryPath(self, base_tweet):
+        # Get the metadata of the base Tweet.
+        metadata = self.scrapeMetadata(base_tweet, "")
+        
+        # Get any text the base Tweet may have.
+        text = ""
+        try:
+            # Locate the tweet in the Twitter webpage.
+            media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet'][@tabindex='-1']")
+            # Locate the text in the base Tweet.
+            textblock = base_tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of the xpath means "search the children of this element".
+            textblock_children_list = textblock.find_elements(By.XPATH, "*")
+            # Parse the text within the tweet.
+            for element in textblock_children_list:
+                text = text + element.text
+                if element.tag_name == "img":  # Check for Emojis (which are SVG images on Twitter)
+                    text = text + element.get_attribute("alt")
+                elif element.text == "":
+                    text = text + "\n" + "\n"
+            
+        except NoSuchElementException as e:
+            print("  Cannot find text in the base Tweet, using placeholder for directory name.")
+            text = "mediaOnly"
+        
+        # Generate download directory name.
+        datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+        disallowed_characters = ['#','%','&','{','}','\\','<','>','*','?','/',' ','$','!','\'','\"',':','@','+','`','|','=']
+        sanitized_id = "".join(filter(lambda char: char not in disallowed_characters , text))
+        dir_name = datestring + "__" + sanitized_id[0:16]
+        path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(metadata["author"], dir_name))
+        
+        return path_to_download_dir
+    
+    # Saves the metadata of a Tweet to a file.
     # Helper function for all "download[postType]" functions.
     # Returns a Boolean, representing whether the download succeeded.
-    def downloadMetadata(self, current_metadata, url, postType, path_to_download_dir, images_to_archive=None):
+    def downloadMetadata(self, current_metadata, path_to_download_dir, tweet_number):
         metadata = current_metadata
-        # Record the type of post.
-        metadata["post type"] = postType
-        # Record the URL the scraper was given.
-        metadata["url"] = str(url)
-        
-        try:
-            # Record the image source URLs, if given.
-            if images_to_archive != None:
-                image_count = 0
-                for image_source_url,image_type in images_to_archive:
-                    image_count += 1
-                    metadata[("image_" + str(image_count) + "_url")] = str(image_source_url)
-                # Record the number of images, if relevant.
-                metadata["number_of_images"] = str(image_count)
             
+        try:
             # Try to save the metadata.
-            metadata_filename = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S') + "__" + "metadata" + ".json"
+            metadata_filename = str(tweet_number) + "__" + metadata["date"].strftime('%Y-%m-%d_%H-%M-%S') + "__" + "metadata" + ".json"
             metadata["date"] = metadata["date"].strftime('%Y-%m-%d, %HH:%MM:%SS')
             json_metadata = json.dumps(metadata)
             with open(os.path.join(path_to_download_dir, metadata_filename), 'w') as file:
@@ -194,14 +299,12 @@ class TwitterScraper():
     #   Boolean represents whether the download succeeded.
     #   String is the downloaded text, or None if download failed.
     #   JSON is the post metadata, or None if download failed.
-    def downloadText(self, url):
+    def downloadText(self, tweet, tweet_number, metadata, path_to_download_dir):
         try:
-            # Locate the tweet in the Twitter webpage.
-            media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
-            # Locate the text in Twitter.
-            textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
+        # Locate the text in the Tweet.
+            textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of the xpath means "search the children of this element".
             textblock_children_list = textblock.find_elements(By.XPATH, "*")
-            # Parse the text within the tweet.
+        # Parse the text within the tweet.
             text = ""
             for element in textblock_children_list:
                 text = text + element.text
@@ -209,35 +312,21 @@ class TwitterScraper():
                     text = text + element.get_attribute("alt")
                 elif element.text == "":
                     text = text + "\n" + "\n"
-            
-            # Retrieve the post's metadata from the Twitter page.
-            metadata = self.scrapeMetadata()
-            
-            # Try to download the post.
+        
             datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-            dir_name = datestring + "__" + text.replace(" ", "")[0:16]
-            path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(metadata["author"], dir_name))
             
-            # If the directory already exists, the post has already been downloaded.
-            if os.path.exists(path_to_download_dir):
-                # Skip downloading this post.
-                print("This text post from Twitter has already been downloaded!")
-                return(True)
-            else:
-                # Create the post's archive directory.
-                os.makedirs(path_to_download_dir)
-                
-                # Try to save the post's metadata.
-                if self.downloadMetadata(metadata, url, "text", path_to_download_dir) is False:
-                    return(False)
+        # Try to download the post.
+            # Try to save the post's metadata.
+            if self.downloadMetadata(metadata, path_to_download_dir, tweet_number) is False:
+                return(False)
             
-                # Download this post.
-                filename = datestring + ".txt"
-                with open(os.path.join(path_to_download_dir, filename), 'w', encoding="utf-8") as file:
-                    file.write(text)
-                
-                # Return a success.
-                return(True)
+            # Download this post.
+            text_filename = str(tweet_number) + "__" + datestring + ".txt"
+            with open(os.path.join(path_to_download_dir, text_filename), 'w', encoding="utf-8") as file:
+                file.write(text)
+            
+            # Return a success.
+            return(True)
         
         except NoSuchElementException as e:
             print("  Error downloading text from Twitter!")
@@ -250,14 +339,12 @@ class TwitterScraper():
     #   Boolean represents whether the download succeeded.
     #   String is the downloaded text, or None if download failed.
     #   JSON is the post metadata, or None if download failed.
-    def downloadImage(self, url):
+    def downloadImage(self, tweet, tweet_number, metadata, path_to_download_dir):
         try:
-            # Locate the tweet in the Twitter webpage.
-            media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
-            # Locate the text in Twitter.
-            textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
+        # Locate the text in the Tweet.
+            textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
             textblock_children_list = textblock.find_elements(By.XPATH, "*")
-            # Parse the text within the tweet.
+        # Parse the text within the tweet.
             text = ""
             for element in textblock_children_list:
                 text = text + element.text
@@ -265,9 +352,16 @@ class TwitterScraper():
                     text = text + element.get_attribute("alt")
                 elif element.text == "":
                     text = text + "\n" + "\n"
-            # Locate the image/s in Twitter.
+        
+        except NoSuchElementException as e:
+            print("  No text accompanies this image post.")
+            text = ""
+        
+        try:
+        # Locate the image/s in Twitter.
             images_to_archive = []
-            imageblock = media.find_elements(By.XPATH, ".//div[@data-testid='tweetPhoto']")
+            self.wait.until(EC.visibility_of_element_located((By.XPATH, ".//div[@data-testid='tweetPhoto']")))
+            imageblock = tweet.find_elements(By.XPATH, ".//div[@data-testid='tweetPhoto']")
             for images in imageblock:
                 image_url = images.find_element(By.TAG_NAME, 'img').get_attribute("src")
                 max_size_image_url = re.sub('(name=)\w+', "name=orig", image_url, 1)
@@ -275,56 +369,52 @@ class TwitterScraper():
                 image_type = re.search('(format=)\w+', image_url).group(0).split('=')[1]
                 images_to_archive.append([max_size_image_url, image_type])
             
-            # Retrieve the post's metadata from the Twitter page.
-            metadata = self.scrapeMetadata()
-            
-            # Try to download the post.
             datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-            dir_name = datestring + "__" + text.replace(" ", "")[0:16]
-            path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(metadata["author"], dir_name))
+        
+        # Try to download the post.
+            # Record the image source URLs, if given.
+            if images_to_archive != None:
+                image_count = 0
+                for image_source_url,image_type in images_to_archive:
+                    image_count += 1
+                    metadata[("image_" + str(image_count) + "_url")] = str(image_source_url)
+                # Record the number of images.
+                metadata["number_of_images"] = str(image_count)
             
-            # If the directory already exists, the post has already been downloaded.
-            if os.path.exists(path_to_download_dir):
-                # Skip downloading this post.
-                print("  This image post from Twitter has already been downloaded!")
-                return(True)
-            else:
-                # Create the post's archive directory.
-                os.makedirs(path_to_download_dir)
-                
-                # Try to retrieve and save the post's metadata.
-                if self.downloadMetadata(metadata, url, "image", path_to_download_dir, images_to_archive) is False:
-                    return(False)
-            
-                # Download this post's text.
-                text_filename = datestring + ".txt"
+            # Try to save the post's metadata.
+            if self.downloadMetadata(metadata, path_to_download_dir, tweet_number) is False:
+                return(False)
+        
+            # Download this post's text.
+            if text != "":
+                text_filename = str(tweet_number) + "__" + datestring + ".txt"
                 with open(os.path.join(path_to_download_dir, text_filename), 'w', encoding='utf-8') as file:
                     file.write(text)
+            
+            # Download this post's image/s.
+            image_count = 1
+            for image_source_url,image_type in images_to_archive:
+                image_filename = str(tweet_number) + "__" + datestring + "_" + str(image_count) + "." + image_type
+                if image_type == "jpg":
+                    image_type = "JPEG"
+                else:
+                    image_type = image_type.upper()
                 
-                # Download this post's image/s.
-                image_count = 1
-                for image_source_url,image_type in images_to_archive:
-                    image_filename = datestring + "_" + str(image_count) + "." + image_type
-                    if image_type == "jpg":
-                        image_type = "JPEG"
-                    else:
-                        image_type = image_type.upper()
-                    
-                    try:
-                        image_content = requests.get(image_source_url).content
-                        image_file = io.BytesIO(image_content)
-                        image = Image.open(image_file)
-                        with open(os.path.join(path_to_download_dir, image_filename), 'wb') as file:
-                            image.save(file, image_type)
-                    except Exception as e:
-                        print("  Error downloading image from Twitter!")
-                        print(e)
-                        return(False)
-                    
-                    image_count += 1
+                try:
+                    image_content = requests.get(image_source_url).content
+                    image_file = io.BytesIO(image_content)
+                    image = Image.open(image_file)
+                    with open(os.path.join(path_to_download_dir, image_filename), 'wb') as file:
+                        image.save(file, image_type)
+                except Exception as e:
+                    print("  Error downloading image from Twitter!")
+                    print(e)
+                    return(False)
                 
-                # Return a success.
-                return(True)
+                image_count += 1
+            
+            # Return a success.
+            return(True)
         
         except NoSuchElementException as e:
             print("  Error downloading image from Twitter!")
@@ -337,14 +427,12 @@ class TwitterScraper():
     #   Boolean represents whether the download succeeded.
     #   String is the downloaded text, or None if download failed.
     #   JSON is the post metadata, or None if download failed.
-    def downloadVideo(self, url):
+    def downloadVideo(self, tweet, tweet_number, metadata, path_to_download_dir):
         try:
-            # Locate the tweet in the Twitter webpage.
-            media = self.driver.find_element(By.XPATH, "//article[@data-testid='tweet']")
-            # Locate the text in Twitter.
-            textblock = media.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
+        # Locate the text in the Tweet.
+            textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
             textblock_children_list = textblock.find_elements(By.XPATH, "*")
-            # Parse the text within the tweet.
+        # Parse the text within the tweet.
             text = ""
             for element in textblock_children_list:
                 text = text + element.text
@@ -352,55 +440,103 @@ class TwitterScraper():
                     text = text + element.get_attribute("alt")
                 elif element.text == "":
                     text = text + "\n" + "\n"
-            # Locate the video in Twitter.
-            videoblock = media.find_element(By.XPATH, ".//div[@data-testid='videoPlayer']")
+        
+        except NoSuchElementException as e:
+            print("  No text accompanies this video post.")
+            text = ""
+        
+        try:
+        # Locate the video in Twitter.
+            videoblock = tweet.find_element(By.XPATH, ".//div[@data-testid='videoPlayer']")
             video = videoblock.find_elements(By.XPATH, ".//video[@aria-label='Embedded video']")
+            self.wait.until(EC.visibility_of(videoblock))
             
-            # Retrieve the post's metadata from the Twitter page.
-            metadata = self.scrapeMetadata()
+            username_block = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+            date = tweet.find_element(By.TAG_NAME, 'time').text
+            direct_tweet_link = username_block.find_element(By.XPATH, ".//a[@aria-label='" + date + "']").get_attribute("href")
             
-            # Try to download the post.
             datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-            dir_name = datestring + "__" + text.replace(" ", "")[0:16]
-            path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(metadata["author"], dir_name))
             
-            # If the directory already exists, the post has already been downloaded.
-            if os.path.exists(path_to_download_dir):
-                # Skip downloading this post.
-                print("  This video post from Twitter has already been downloaded!")
-                return(True)
-            else:
-                # Create the post's archive directory.
-                os.makedirs(path_to_download_dir)
-                
-                # Try to retrieve and save the post's metadata.
-                if self.downloadMetadata(metadata, url, "video", path_to_download_dir) is False:
-                    return(False)
+        # Try to download the post.
+            # Try to save the post's metadata.
+            if self.downloadMetadata(metadata, path_to_download_dir, tweet_number) is False:
+                return(False)
             
-                # Download this post's text.
-                text_filename = datestring + ".txt"
+            # Download this post's text.
+            if text != "":
+                text_filename = str(tweet_number) + "__" + datestring + ".txt"
                 with open(os.path.join(path_to_download_dir, text_filename), 'w', encoding='utf-8') as file:
                     file.write(text)
-                
-                # Download this post's video.
-                video_filename = datestring + ".mp4"
-                ydl_opts = {'outtmpl': os.path.join(path_to_download_dir, video_filename)}
-                y_downloader = YDLScraperHelper(ydl_opts)
-                try:
-                    y_downloader.download(url)
-                except Exception as e:
-                    print("  Error downloading video from Twitter!")
-                    print(e)
-                    return(False)
-                
-                # Return a success.
-                return(True)
+            
+            # Download this post's video.
+            video_filename = str(tweet_number) + "__" + datestring + ".mp4"
+            ydl_opts = {'outtmpl': os.path.join(path_to_download_dir, video_filename)}
+            y_downloader = YDLScraperHelper(ydl_opts)
+            try:
+                y_downloader.download(direct_tweet_link)
+            except Exception as e:
+                print("  Error downloading video from Twitter!")
+                print(e)
+                return(False)
+            
+            # Return a success.
+            return(True)
         
         except NoSuchElementException as e:
             print("  Error downloading video from Twitter!")
             print(e)
             # Return a failure.
             return(False)
+    
+    def scrapeFromTwitter(self, url):
+    # Navigate to the requested page on Twitter.
+        self.goToPage(url)
+        # Determine the Tweets to download from a Thread on a page.
+        list_of_tweets_in_thread, base_tweet = self.analyzeThread()
+        
+    # Create a new directory to save the Thread or Tweet to.
+        dir_path = self.generatePostDirectoryPath(base_tweet)
+        # If the directory already exists, this Tweet (or exact slice of a Thread tree) has already been downloaded.
+        if os.path.exists(dir_path):
+            # Skip downloading this post.
+            print("  This Tweet or Thread from Twitter has already been downloaded!")
+            return(False)
+        else:
+            # Create the post's archive directory.
+            os.makedirs(dir_path)
+    
+    # Download each post in the Thread.
+        tweet_count = 0
+        for tweet in list_of_tweets_in_thread:
+            tweet_count += 1
+            # Retrieve the post's metadata from the Twitter page.
+            metadata = self.scrapeMetadata(tweet, url)
+            
+            success = False
+            text = ""
+            # Determine the type of media the post contains.
+            mediaType = self.analyzePageMedia(tweet)
+            # Record the type of post.
+            metadata["post type"] = mediaType
+            # Attempt to download the post and its metadata.
+            if mediaType == "text":
+                print("  Text post!")
+                if not self.downloadText(tweet, tweet_count, metadata, dir_path):
+                    return False
+            elif mediaType == "image":
+                print("  Image post!")
+                if not self.downloadImage(tweet, tweet_count, metadata, dir_path):
+                    return False
+            elif mediaType == "video":
+                print("  Video post!")
+                if not self.downloadVideo(tweet, tweet_count, metadata, dir_path):
+                    return False
+            else:
+                return False
+            
+    # Attempt to download the thread's metadata.
+        
+        return True
 
 
 class YDLLogger(object):
