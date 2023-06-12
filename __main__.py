@@ -128,7 +128,8 @@ def main(argv):
                 # Scrape the Twitter post.
                 success = twitter_scraper.scrapeFromTwitter(url)
                 if not success:
-                    logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                    pass
+                    #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
         else:
             logger.log(url, "SKIPPED", "Website has no associated scraper.")
     
