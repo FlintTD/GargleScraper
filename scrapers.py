@@ -151,12 +151,21 @@ class TwitterScraper():
     
     
     # Determine if this tweet contains a quoted tweet.
-    # Returns the URL of the quoted Tweet if found, or an empty string if not found.
+    # Returns:
+    # * the URL of a quoted Tweet if found,
+    # * 'DELETED' if a quoted Tweet is found but deleted,
+    # * or an empty string if no quoted Tweet is found.
     def checkForQuoteTweets(self, tweet):
         try:
+            # Check for non-deleted Quote Tweet.
             quote_tweet = tweet.find_element(By.XPATH, ".//div[@tabindex='0'][@role='link']")
         except NoSuchElementException:
-            return ""
+            try:
+                # Check for deleted Quote Tweet.
+                quote_tweet = tweet.find_element(By.XPATH, ".//article[@tabindex='-1'][@role='article']")
+                return "DELETED"
+            except NoSuchElementException:
+                return ""
         else:
             quoteTweetUrl = quote_tweet.find_element(By.XPATH, ".//a[@href][@role='link']").get_attribute("href")
             sanitizedUrl = quoteTweetUrl.replace(r'/photo/1', '')
@@ -189,13 +198,14 @@ class TwitterScraper():
         
         # Determine if the Tweet contains a Quote-Tweet.
         is_quoting = False
-        if self.checkForQuoteTweets(tweet) != "":
+        quote_url = self.checkForQuoteTweets(tweet)
+        if quote_url != "" or 'DELETED':
             is_quoting = True
         
         # Try to find a video in the tweet first.
         try:
             video = tweet.find_element(By.XPATH, ".//div[@data-testid='videoPlayer']")
-            if is_quoting:
+            if is_quoting and (quote_url != 'DELETED'):
                 if self.isElementInQuotedTweet(video):
                     #print("  Not a video post, video found inside quoted tweet!")
                     raise NoSuchElementException
@@ -208,7 +218,7 @@ class TwitterScraper():
         # Try to find an image in the tweet second.
         try:
             image = tweet.find_element(By.XPATH, ".//div[@aria-label='Image']")
-            if is_quoting:
+            if is_quoting and (quote_url != 'DELETED'):
                 if self.isElementInQuotedTweet(image):
                     #print("  Not an image post, image found inside quoted tweet!")
                     raise NoSuchElementException
@@ -221,7 +231,7 @@ class TwitterScraper():
         # Try to find text in the tweet last.
         try:
             text = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
-            if is_quoting:
+            if is_quoting and (quote_url != 'DELETED'):
                 if self.isElementInQuotedTweet(text):
                     #print("  Not a text post, text found inside quoted tweet!")
                     raise NoSuchElementException
@@ -231,7 +241,7 @@ class TwitterScraper():
         else:
             return "text"
         
-        print("Error! Twitter scraper is unsure what this Tweet contains!")
+        print("Error! Twitter scraper is unsure what media this Tweet contains!")
     
     
     # Look at the loaded Twitter page, and pick out the relevant Tweets from a Thread.
@@ -677,7 +687,10 @@ class TwitterScraper():
             # If it does, save it for later scraping.
             # (Because we must navigate off the current page to scrape quoted Tweets.)
             quoteTweetUrl = self.checkForQuoteTweets(tweet)
-            if quoteTweetUrl != "":
+            if quoteTweetUrl == 'DELETED':
+                metadata["quoting a tweet"] = True
+                metadata["quoted tweet url"] = quoteTweetUrl
+            elif quoteTweetUrl != "":
                 scrapeIndividuallyQueue.append({"url": quoteTweetUrl, "count": tweet_count, "metadata": None})
                 metadata["quoting a tweet"] = True
                 metadata["quoted tweet url"] = quoteTweetUrl
@@ -703,6 +716,7 @@ class TwitterScraper():
                     if "status" in linkAddress:
                         # We are looking for the datestamp link that directly permalinks to the tweet in question.
                         tweet_url = linkAddress
+                        metadata["url"] = tweet_url
                 
                 # Identify if this Tweet has a "Show more" link.
                 try:
@@ -715,9 +729,10 @@ class TwitterScraper():
                 except Exception as e:
                     #print(e)
                     pass
+            else:
+                metadata["url"] = url
             
             if not is_show_more_tweet:
-                metadata["url"] = tweet_url
                 # Attempt to download a single Tweet and its metadata.
                 if not self.downloadTweet(tweet, tweet_count, metadata, dir_path):
                     # Delete the post's archive directory.
