@@ -130,7 +130,7 @@ class TwitterScraper():
         try:
             # Find the full "conversation" thread (e.g. tweet + comments + previous tweets).
             error_message = conversation.find_element(By.XPATH, "//div[@data-testid='error-detail']")
-            deleted = True
+            return True
         except Exception as e:
             deleted = False
         
