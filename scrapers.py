@@ -124,13 +124,30 @@ class TwitterScraper():
     def isTweetDeleted(self):
         # Wait for the content column on the page to fully load.
         self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Home timeline']")))
+        conversation = self.driver.find_element(By.XPATH, "//div[@aria-label='Home timeline']")
+        deleted = False
         
         try:
             # Find the full "conversation" thread (e.g. tweet + comments + previous tweets).
-            error_message = self.driver.find_element(By.XPATH, "//div[@data-testid='error-detail']")
-            return True
+            error_message = conversation.find_element(By.XPATH, "//div[@data-testid='error-detail']")
+            deleted = True
         except Exception as e:
-            return False
+            deleted = False
+        
+        # If the scraper cannot find Tweet text, but it can find this text string, then this Tweet has been taken down.
+        try:
+            tweet = conversation.find_element(By.XPATH, ".//article[@tabindex='-1']")
+            text = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
+            deleted = False
+        except Exception as e:
+            try:
+                tweet = conversation.find_element(By.XPATH, ".//article[@tabindex='-1']")
+                tweet.find_element(By.XPATH, ".//span[contains(text(), 'This Tweet is from an account that no longer exists.')]")
+                deleted = True
+            except:
+                deleted = False
+        
+        return deleted
     
     
     # Determine if this tweet contains a quoted tweet.
