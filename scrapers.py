@@ -84,7 +84,7 @@ class TwitterScraper():
     
     
     def teardown(self):
-        print("  Twitter scraper module deactivating...")
+        print("Twitter scraper module deactivating...")
         self.driver.close()
     
     
@@ -630,7 +630,7 @@ class TwitterScraper():
         self.goToPage(url)
         
         # Check to see if the tweet has been deleted.
-        if isTweetDeleted():
+        if self.isTweetDeleted():
             print("  This Tweet from Twitter has been deleted!")
             return False
         
