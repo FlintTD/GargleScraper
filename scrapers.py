@@ -119,7 +119,19 @@ class TwitterScraper():
         except Exception as e:
             print("Error taking screenshot of web element!")
             print(e)
-            
+    
+    
+    def isTweetDeleted(self):
+        # Wait for the content column on the page to fully load.
+        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Home timeline']")))
+        
+        try:
+            # Find the full "conversation" thread (e.g. tweet + comments + previous tweets).
+            error_message = self.driver.find_element(By.XPATH, "//div[@data-testid='error-detail']")
+            return True
+        except Exception as e:
+            return False
+    
     
     # Determine if this tweet contains a quoted tweet.
     # Returns the URL of the quoted Tweet if found, or an empty string if not found.
@@ -155,8 +167,13 @@ class TwitterScraper():
     
     # Determine what kind of media is present in the provided Tweet.
     # Arguements: "tweet" is a Selenium driver element pointing to a specific Tweet in a page and Thread.
-    def determineTweetMediaContents(self, tweet, is_quoting):
+    def determineTweetMediaContents(self, tweet):
         #tweet.screenshot("/Logs/tweet.png")
+        
+        # Determine if the Tweet contains a Quote-Tweet.
+        is_quoting = False
+        if self.checkForQuoteTweets(tweet) != "":
+            is_quoting = True
         
         # Try to find a video in the tweet first.
         try:
@@ -203,8 +220,8 @@ class TwitterScraper():
     # Look at the loaded Twitter page, and pick out the relevant Tweets from a Thread.
     # Returns a List of individual Tweets.
     def analyzeThread(self):
-        # Wait for the conversation on the page to fully load.
-        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Timeline: Conversation']")))
+        # Wait for the content column on the page to fully load.
+        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Home timeline']")))
         
         # Find the full "conversation" thread (e.g. tweet + comments + previous tweets).
         conversation = self.driver.find_element(By.XPATH, "//div[@aria-label='Timeline: Conversation']")
@@ -259,7 +276,7 @@ class TwitterScraper():
     
     # Retrieves the metadata of a Tweet, when that Tweet is already open in the webdriver.
     # Returns a dictionary of metadata, if successful.
-    def scrapeMetadata(self, tweet, url):
+    def scrapeMetadata(self, tweet, url, base_tweet_override = False):
         metadata = {}
         
         try:
@@ -274,13 +291,19 @@ class TwitterScraper():
             metadata["date"] = datetime_obj
             
             # Record whether this Tweet is the base Tweet.
-            is_base_tweet = str(tweet.get_attribute("tabindex"))
-            if is_base_tweet == "-1":
-                # Record this as the base tweet.
-                metadata["base_tweet"] = True
+            if not base_tweet_override:
+                is_base_tweet = str(tweet.get_attribute("tabindex"))
+                if is_base_tweet == "-1":
+                    # Record this as the base tweet.
+                    metadata["base_tweet"] = True
+                    # Record the URL the scraper was given.
+                    metadata["url"] = str(url)
+                else:
+                    # Record this is not the base tweet.
+                    metadata["base_tweet"] = False
+            else:
                 # Record the URL the scraper was given.
                 metadata["url"] = str(url)
-            else:
                 # Record this is not the base tweet.
                 metadata["base_tweet"] = False
             
@@ -365,7 +388,7 @@ class TwitterScraper():
         # Locate the text in the Tweet.
             textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of the xpath means "search the children of this element".
             textblock_children_list = textblock.find_elements(By.XPATH, "*")
-        
+            
         # Parse the text within the tweet.
             text = ""
             for element in textblock_children_list:
@@ -558,13 +581,13 @@ class TwitterScraper():
     def downloadTweet(self, tweet, tweet_count, metadata, dir_path):
         downloaded = False
         if metadata["post type"] == "text":
-            print("  " + str(tweet_count) + ": Text post.")
+            print("  #" + str(tweet_count) + " - text post")
             downloaded = self.downloadText(tweet, tweet_count, metadata, dir_path)
         elif metadata["post type"] == "image":
-            print("  " + str(tweet_count) + ": Image post.")
+            print("  #" + str(tweet_count) + " - image post")
             downloaded = self.downloadImage(tweet, tweet_count, metadata, dir_path)
         elif metadata["post type"] == "video":
-            print("  " + str(tweet_count) + ": Video post.")
+            print("  #" + str(tweet_count) + " - video post")
             downloaded = self.downloadVideo(tweet, tweet_count, metadata, dir_path)
         else:
             return downloaded
@@ -573,7 +596,7 @@ class TwitterScraper():
     
     
     # Download the full data and metadata of one Tweet, ignoring Threads and replies.
-    def scrapeOnlyThisTweet(self, url, tweet_count, dir_path):
+    def scrapeOnlyThisTweet(self, url, tweet_count, prior_metadata, dir_path):
     # Navigate to the requested page on Twitter.
         #print("  Scraping quote tweet URL:")
         #print("    " + url)
@@ -584,10 +607,14 @@ class TwitterScraper():
     
     # Download just the indicated post.
         # Retrieve the post's metadata from the Twitter page.
-        metadata = self.scrapeMetadata(tweet, url)
+        can_never_be_base_tweet = True
+        if prior_metadata == None:
+            metadata = self.scrapeMetadata(tweet, url, can_never_be_base_tweet)
+        else:
+            metadata = prior_metadata
         
         # Determine the type of media the post contains.
-        mediaType = self.determineTweetMediaContents(tweet, False)
+        mediaType = self.determineTweetMediaContents(tweet)
         # Record the type of post.
         metadata["post type"] = mediaType
         # Attempt to download a single Tweet and its metadata.
@@ -601,6 +628,12 @@ class TwitterScraper():
     def scrapeFromTwitter(self, url):
     # Navigate to the requested page on Twitter.
         self.goToPage(url)
+        
+        # Check to see if the tweet has been deleted.
+        if isTweetDeleted():
+            print("  This Tweet from Twitter has been deleted!")
+            return False
+        
         # Determine the Tweets to download from a Thread on a page.
         list_of_tweets_in_thread, base_tweet = self.analyzeThread()
         
@@ -617,7 +650,7 @@ class TwitterScraper():
     
     # Download each post in the Thread.
         tweet_count = 0
-        quoteTweetQueue = []
+        scrapeIndividuallyQueue = []
         for tweet in list_of_tweets_in_thread:
             tweet_count += 1
             # Retrieve the post's metadata from the Twitter page.
@@ -627,30 +660,61 @@ class TwitterScraper():
             # If it does, save it for later scraping.
             # (Because we must navigate off the current page to scrape quoted Tweets.)
             quoteTweetUrl = self.checkForQuoteTweets(tweet)
-            isQuoting = False
             if quoteTweetUrl != "":
-                quoteTweetQueue.append({"url": quoteTweetUrl, "count": tweet_count})
+                scrapeIndividuallyQueue.append({"url": quoteTweetUrl, "count": tweet_count, "metadata": None})
                 metadata["quoting a tweet"] = True
                 metadata["quoted tweet url"] = quoteTweetUrl
-                isQuoting = True
                 tweet_count += 1
             
             # Determine the type of media the post contains.
-            mediaType = self.determineTweetMediaContents(tweet, isQuoting)
+            mediaType = self.determineTweetMediaContents(tweet)
             # Record the type of post.
             metadata["post type"] = mediaType
-            # Attempt to download a single Tweet and its metadata.
-            if not self.downloadTweet(tweet, tweet_count, metadata, dir_path):
-                # Delete the post's archive directory.
-                shutil.rmtree(dir_path)
-                return False
+            
+            # If the post contains a "Show more" link, add it to the scrape individually queue.
+            # Don't do this if this is the base tweet.
+            is_show_more_tweet = False
+            is_base_tweet = str(tweet.get_attribute("tabindex"))
+            if is_base_tweet == "0":  #not the base tweet
+                # Get the URL of the tweet, as we only know the base tweet URL already.
+                usernameBlock = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+                linksInUsernameBlock = usernameBlock.find_elements(By.XPATH, ".//a[@role='link']")
+                tweet_url = None
+                for link in linksInUsernameBlock:
+                    # There should be three links in the username block at the top of a tweet.
+                    linkAddress = link.get_attribute("href")
+                    if "status" in linkAddress:
+                        # We are looking for the datestamp link that directly permalinks to the tweet in question.
+                        tweet_url = linkAddress
+                
+                # Identify if this Tweet has a "Show more" link.
+                try:
+                    textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")
+                    showMore = textblock.find_element(By.XPATH, ".//span[starts-with(@data-testid, 'tweet-text-show-more-link-')]")
+                    # Assuming it does have a "Show more" link, add it to the queue to later scrape individually.
+                    scrapeIndividuallyQueue.append({"url": tweet_url, "count": tweet_count, "metadata": metadata})
+                    #print(showMore.get_attribute("data-testid"))
+                    is_show_more_tweet = True
+                except Exception as e:
+                    #print(e)
+                    pass
+            
+            if not is_show_more_tweet:
+                metadata["url"] = tweet_url
+                # Attempt to download a single Tweet and its metadata.
+                if not self.downloadTweet(tweet, tweet_count, metadata, dir_path):
+                    # Delete the post's archive directory.
+                    shutil.rmtree(dir_path)
+                    return False
+                
         
     # Download each Quote tweet saved for later download.
-        for quote_tweet in quoteTweetQueue:
-            print("  Scraping quoted tweet...")
-            self.scrapeOnlyThisTweet(quote_tweet["url"], quote_tweet["count"], dir_path)
-            print("  ...done!")
+        print("  Scraping queue of deferred tweets...")
+        for tweet in scrapeIndividuallyQueue:
+            self.scrapeOnlyThisTweet(tweet["url"], tweet["count"], tweet['metadata'], dir_path)
             self.goBackAPage()
+        print("  ...done!")
+    
     # Attempt to download the thread's metadata.
         
         return True
