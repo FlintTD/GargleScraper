@@ -57,7 +57,7 @@ def main(argv):
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             # Print out the help text.
-            print('HELPTEXT:')
+            print('HELP TEXT:')
             print('  __main__.py -u <URL to media>    (overrides Gmail integration)')
             print('  __main__.py -g      (engages Gmail integration)')
             print('  __main__.py -l <Post limit>')
