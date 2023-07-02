@@ -179,18 +179,24 @@ class TwitterScraper():
     
     # A recursive function looking at every parent element of the input element.
     def isElementInQuotedTweet(self, element):
-        parent = element.find_element(By.XPATH, '..')
-        if parent.tag_name == "article":
-            return False
-        
-        if parent.get_attribute("aria-labelledby") is None:
-            # If the attribute isn't present, then this parent is definitely not an element from a Quoted Tweet.
-            return self.isElementInQuotedTweet(parent)
-        elif parent.tag_name == "div":
-            # If the attribute is present, and the element is a div, then this parent element is from a Quoted Tweet.
-            return True
-        else:
-            return False
+        try:
+            parent = element.find_element(By.XPATH, '..')
+            if parent.tag_name == "article":
+                return False
+            
+            # In the below process, we are looking for a <div> element with the attribute "role=link".
+            # This element is a Quoted Tweet.
+            if parent.get_attribute("role") is None:
+                # If the attribute isn't present in the parent, then we cannot know if this is an element from a Quoted Tweet.
+                return self.isElementInQuotedTweet(parent)
+            elif parent.tag_name == "div":
+                # If the attribute is present, and the element is a div, then this parent element is from a Quoted Tweet.
+                return True
+            else:
+                return False
+        except Exception as e:
+            print(e)
+            time.sleep(20)
     
     
     # Determine what kind of media is present in the provided Tweet.
@@ -221,7 +227,6 @@ class TwitterScraper():
         try:
             image = tweet.find_element(By.XPATH, ".//div[@aria-label='Image']")
             if is_quoting and (quote_url != 'DELETED'):
-                print("It's an Image!")
                 if self.isElementInQuotedTweet(image):
                     #print("  Not an image post, image found inside quoted tweet!")
                     raise NoSuchElementException
