@@ -29,6 +29,7 @@ class TwitterScraper():
         self.working_dir = os.path.dirname(__file__)
         self.relative_path_to_archive = "Archive"
         self.path_to_archive = os.path.join(self.working_dir, self.relative_path_to_archive)
+        self.posts_viewed = 0
         chrome_options = Options()
         chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
         self.driver = webdriver.Chrome(
@@ -91,6 +92,7 @@ class TwitterScraper():
     def goToPage(self, url):
         self.driver.get(str(url))
         self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, "main")))
+        self.posts_viewed += 1
         time.sleep(1)
     
     
@@ -219,6 +221,7 @@ class TwitterScraper():
         try:
             image = tweet.find_element(By.XPATH, ".//div[@aria-label='Image']")
             if is_quoting and (quote_url != 'DELETED'):
+                print("It's an Image!")
                 if self.isElementInQuotedTweet(image):
                     #print("  Not an image post, image found inside quoted tweet!")
                     raise NoSuchElementException
@@ -652,14 +655,19 @@ class TwitterScraper():
     
     
     # Download the full data and metadata of a Tweet or Thread (whichever is found).
+    # Returns two values:
+    #     True or False boolean, indicating a successful scrape or not.
+    #     Integer quantity of posts navigated to; counting for checking the Twitter post limiter.
     def scrapeFromTwitter(self, url):
+    # Reset the local count of posts viewed.
+        self.posts_viewed = 0
     # Navigate to the requested page on Twitter.
         self.goToPage(url)
         
         # Check to see if the tweet has been deleted.
         if self.isTweetDeleted():
             print("  This Tweet from Twitter has been deleted!")
-            return False
+            return False, self.posts_viewed
         
         # Determine the Tweets to download from a Thread on a page.
         list_of_tweets_in_thread, base_tweet = self.analyzeThread()
@@ -670,7 +678,7 @@ class TwitterScraper():
         if os.path.exists(dir_path):
             # Skip downloading this post.
             print("  This Tweet or Thread from Twitter has already been downloaded!")
-            return(False)
+            return False, self.posts_viewed
         else:
             # Create the post's archive directory.
             os.makedirs(dir_path)
@@ -737,7 +745,7 @@ class TwitterScraper():
                 if not self.downloadTweet(tweet, tweet_count, metadata, dir_path):
                     # Delete the post's archive directory.
                     shutil.rmtree(dir_path)
-                    return False
+                    return False, self.posts_viewed
                 
         
     # Download each Quote tweet saved for later download.
@@ -747,9 +755,9 @@ class TwitterScraper():
             self.goBackAPage()
         print("  ...done!")
     
-    # Attempt to download the thread's metadata.
+    # TODO: Attempt to download the thread's metadata.
         
-        return True
+        return True, self.posts_viewed
 
 
 class YDLLogger(object):

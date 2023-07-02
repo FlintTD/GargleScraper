@@ -44,14 +44,25 @@ def whichPlatformIsUrl(url):
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hu:g:vs",["help","url=","gmail=","verbose","screenshot"])
+    opts, args = getopt.getopt(argv,"hu:gl:vs",["help","url=","gmail","postlimit=","verbose","screenshot"])
     urls = []
+    USE_URL = False
+    USE_GMAIL = False
+    POST_LIMIT = -1
+    POSTS_VIEWED = 0
+    VERBOSE = False
+    SCREENSHOT = False
+    post_limit_reached = False
     
     for opt, arg in opts:
         if opt in ('-h', '--help'):
             # Print out the help text.
-            print('__main__.py -u <URL to media>')
-            print('__main__.py -g')
+            print('HELPTEXT:')
+            print('  __main__.py -u <URL to media>    (overrides Gmail integration)')
+            print('  __main__.py -g      (engages Gmail integration)')
+            print('  __main__.py -l <Post limit>')
+            print('  __main__.py -v      (enables verbose logging)')
+            print('  __main__.py -s      (enables screenshots of posts)')
             # Exit the Gargle Scraper.
             sys.exit()
         
@@ -62,6 +73,9 @@ def main(argv):
         
         elif opt in ('-g', '--gmail'):
             USE_GMAIL = True
+        
+        elif opt in ('-l', '--postlimit'):
+            POST_LIMIT = int(arg)
         
         elif opt in ('-v', '--verbose'):
             VERBOSE = True
@@ -104,36 +118,48 @@ def main(argv):
             if emailBody is not None:
                 urls = sanitizeEmailBody(emailBody)
     
+    if POST_LIMIT == -1:
+        print("Warning!  Scraping without a post limit risks exceeding your daily post cap!")
     
     # Scrape the list of URLs.
     # For each URL, attempt scraping and archiving.
     for url in urls:
-        # Determine which platform the link is for.
-        platform = whichPlatformIsUrl(url)
-        if platform == "twitter":
-            if ACTIVE_PLATFORMS[platform] is True:
-                success = twitter_scraper.scrapeFromTwitter(url)
-                if not success:
-                    logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+        if (POST_LIMIT == -1) or (POSTS_VIEWED < POST_LIMIT):
+            # Determine which platform the link is for.
+            platform = whichPlatformIsUrl(url)
+            if platform == "twitter":
+                if ACTIVE_PLATFORMS[platform] is True:
+                    success = twitter_scraper.scrapeFromTwitter(url)
+                    if not success:
+                        logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                else:
+                    ACTIVE_PLATFORMS[platform] = True
+                    # Prep Twitter account and scraper.
+                    twitter_credentials = credentials_manager.get_twitter_credentials()
+                    twitter_scraper = scrapers.TwitterScraper(
+                                        twitter_credentials['email'],
+                                        twitter_credentials['username'],
+                                        twitter_credentials['password']
+                                        )
+                    twitter_scraper.login()
+                    # Scrape the Twitter post.
+                    success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url)
+                    POSTS_VIEWED += additional_posts_viewed
+                    if not success:
+                        #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                        pass
+                    
             else:
-                ACTIVE_PLATFORMS[platform] = True
-                # Prep Twitter account and scraper.
-                twitter_credentials = credentials_manager.get_twitter_credentials()
-                twitter_scraper = scrapers.TwitterScraper(
-                                    twitter_credentials['email'],
-                                    twitter_credentials['username'],
-                                    twitter_credentials['password']
-                                    )
-                twitter_scraper.login()
-                # Scrape the Twitter post.
-                success = twitter_scraper.scrapeFromTwitter(url)
-                if not success:
-                    pass
-                    #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                logger.log(url, "SKIPPED", "Website has no associated scraper.")
         else:
-            logger.log(url, "SKIPPED", "Website has no associated scraper.")
+            post_limit_reached = True
+            pass
     
     # Cleanup
+    if post_limit_reached:
+        print("Post limit reached!  Some posts remain unscraped!")
+    else:
+        print("Posts viewed: " + str(POSTS_VIEWED))
     if ACTIVE_PLATFORMS["twitter"] is True:
         twitter_scraper.teardown()
     
