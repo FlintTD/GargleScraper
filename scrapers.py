@@ -37,7 +37,9 @@ class TwitterScraper():
             options = chrome_options
         )
         self.wait = WebDriverWait(self.driver, 10, poll_frequency=1, ignored_exceptions=[ElementNotVisibleException, ElementNotSelectableException])
-        
+    
+    
+    def load(self)
         # Load www.twitter.com in a web browser.
         self.driver.get("http://www.twitter.com")
         # Wait until the title of the page includes the word "Twitter".
@@ -352,6 +354,26 @@ class TwitterScraper():
         
         # Return a success.
         return(metadata)
+    
+    
+    # Checks the archive for a post matching the provided URL.
+    def isThisPostArchived(self, url):
+        author_name = url.replace("https://", "").split("/")[1]
+        path_to_author_archive = os.path.join(self.path_to_archive, ("@" + author_name))
+        if os.path.exists(path_to_author_archive):
+            for directory_name in os.listdir(path_to_author_archive):
+                directorypath = os.path.join(path_to_author_archive, directory_name)
+                for file_name in os.listdir(directorypath):
+                    filepath = os.path.join(directorypath, file_name)
+                    if os.path.isfile(filepath):
+                        if "metadata.json" in file_name:
+                            json_file = open(filepath)
+                            post_metadata = json.load(json_file)
+                            if post_metadata["url"] == url:
+                                return True
+        else:
+            return False
+        return False 
     
     
     # Generates a directory path for containing the data from a Thread or single Tweet.

@@ -129,9 +129,13 @@ def main(argv):
             platform = whichPlatformIsUrl(url)
             if platform == "twitter":
                 if ACTIVE_PLATFORMS[platform] is True:
-                    success = twitter_scraper.scrapeFromTwitter(url)
-                    if not success:
-                        logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                    if not twitter_scraper.isThisPostArchived(url):
+                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url)
+                        POSTS_VIEWED += additional_posts_viewed
+                        if not success:
+                            logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                    else:
+                        print("This Tweet has already been scraped and archived!")
                 else:
                     ACTIVE_PLATFORMS[platform] = True
                     # Prep Twitter account and scraper.
@@ -141,14 +145,19 @@ def main(argv):
                                         twitter_credentials['username'],
                                         twitter_credentials['password']
                                         )
-                    twitter_scraper.login()
-                    # Scrape the Twitter post.
-                    success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url)
-                    POSTS_VIEWED += additional_posts_viewed
-                    if not success:
-                        #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
-                        pass
                     
+                    if not twitter_scraper.isThisPostArchived(url):
+                        # Open the Twitter home page.
+                        twitter_scraper.load()
+                        twitter_scraper.login()
+                        # Scrape the Twitter post.
+                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url)
+                        POSTS_VIEWED += additional_posts_viewed
+                        if not success:
+                            #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                            pass
+                    else:
+                        print("This Tweet has already been scraped and archived!")
             else:
                 logger.log(url, "SKIPPED", "Website has no associated scraper.")
         else:
