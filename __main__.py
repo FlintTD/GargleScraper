@@ -44,7 +44,7 @@ def whichPlatformIsUrl(url):
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hu:gl:vs",["help","url=","gmail","postlimit=","verbose","screenshot"])
+    opts, args = getopt.getopt(argv,"hu:gp:vs",["help","url=","gmail","postlimit=","verbose","screenshot"])
     urls = []
     USE_URL = False
     USE_GMAIL = False
@@ -60,7 +60,7 @@ def main(argv):
             print('HELP TEXT:')
             print('  __main__.py -u <URL to media>    (overrides Gmail integration)')
             print('  __main__.py -g      (engages Gmail integration)')
-            print('  __main__.py -l <Post limit>')
+            print('  __main__.py -p <Post limit>')
             print('  __main__.py -v      (enables verbose logging)')
             print('  __main__.py -s      (enables screenshots of posts)')
             # Exit the Gargle Scraper.
@@ -74,7 +74,7 @@ def main(argv):
         elif opt in ('-g', '--gmail'):
             USE_GMAIL = True
         
-        elif opt in ('-l', '--postlimit'):
+        elif opt in ('-p', '--postlimit'):
             POST_LIMIT = int(arg)
         
         elif opt in ('-v', '--verbose'):
@@ -130,7 +130,7 @@ def main(argv):
             if platform == "twitter":
                 if ACTIVE_PLATFORMS[platform] is True:
                     if not twitter_scraper.isThisPostArchived(url):
-                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url)
+                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if not success:
                             logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
@@ -151,7 +151,7 @@ def main(argv):
                         twitter_scraper.load()
                         twitter_scraper.login()
                         # Scrape the Twitter post.
-                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url)
+                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if not success:
                             #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
