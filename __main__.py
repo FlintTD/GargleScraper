@@ -31,6 +31,7 @@ def looksLikeAURL(string):
         return False
 
 
+# Returns a list of apparent URLs from the given string.
 def sanitizeEmailBody(emailBody):
     # Identify all URLs in a provided string.
     # Return a list of all URLs found.
@@ -108,9 +109,12 @@ def main(argv):
             sys.exit()
         
         elif opt in ('-u', '--url'):
-            USE_URL = True
-            # Pass in the URL from the arguement.
-            urls.append(arg)
+            if looksLikeAURL(arg):
+                USE_URL = True
+                # Pass in the URL from the arguement.
+                urls.append(arg)
+            else:
+                print("The given URL appears invalid!")
         
         elif opt in ('-g', '--gmail'):
             USE_GMAIL = True
@@ -203,15 +207,24 @@ def main(argv):
         if not unread_message_ids:
             logger.warning("  No unread messages found!")
         else:
-            #for id in unread_message_ids:
-            email = gmail_account.getEmailFromMessageId(unread_message_ids[0])
-            logger.info(email)
-            emailBody = gmail_account.getEmailBodyFromEmail(email)
-            if emailBody is not None:
-                urls = sanitizeEmailBody(emailBody)
+            urls = []
+            if POST_LIMIT > 0:
+                unread_message_ids = unread_message_ids[0:(POST_LIMIT + 1)]
+                
+            for message_id in unread_message_ids:
+                email = gmail_account.getEmailFromMessageId(message_id)
+                emailBody = gmail_account.getEmailBodyFromEmail(email)
+                if emailBody is not None:
+                    email_urls_list = sanitizeEmailBody(emailBody)
+                    for url_string in email_urls_list:
+                        urls.append(url_string)
+                
     
+    post_count = 0
+    total_posts = len(urls)
     if POST_LIMIT == -1:
         logger.error("Warning! Scraping without a post limit risks exceeding your daily post cap!")
+        total_posts = POST_LIMIT
     
     # Scrape the list of URLs.
     # For each URL, attempt scraping and archiving.
@@ -226,6 +239,7 @@ def main(argv):
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
                             logger.info("Twitter Scraper archived the post at: " + url)
+                            post_count += 1
                         else:
                             logger.error("Twitter Scraper failed to archive the post at: " + url)
                     else:
@@ -246,10 +260,12 @@ def main(argv):
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
                             logger.info("Twitter Scraper archived the post at: " + url)
+                            post_count += 1
                         else:
                             logger.error("Twitter Scraper failed to archive the post at: " + url)
                 else:
-                    logger.warning("This Tweet has already been scraped and archived!")
+                    logger.info("This Tweet has already been scraped and archived: " + url)
+                    post_count += 1
             else:
                 logger.error("This website has no associated scraper: " + url)
         else:
@@ -261,6 +277,9 @@ def main(argv):
         logger.warning("Post limit reached! Some posts remain unscraped!")
     else:
         logger.info("Posts viewed: " + str(POSTS_VIEWED))
+    posts_total_message = f"Completion Rate: {post_count}/{total_posts} given posts have been archived!"
+    logger.info(posts_total_message)
+    print(posts_total_message)
     if ACTIVE_PLATFORMS["twitter"] is True:
         twitter_scraper.teardown()
     

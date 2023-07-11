@@ -457,6 +457,7 @@ class TwitterScraper():
                 self.screenshot(tweet, path_to_download_dir, filename)
             
             # Return a success.
+            logger.info("")
             return(True)
         
         except NoSuchElementException as e:
@@ -637,13 +638,13 @@ class TwitterScraper():
     def downloadTweet(self, tweet, tweet_count, metadata, dir_path, SCREENSHOT):
         downloaded = False
         if metadata["post type"] == "text":
-            logger.info("  #" + str(tweet_count) + " - text post")
+            logger.info("  #" + str(tweet_count) + " in current Twitter thread - text post.")
             downloaded = self.downloadText(tweet, tweet_count, metadata, dir_path, SCREENSHOT)
         elif metadata["post type"] == "image":
-            logger.info("  #" + str(tweet_count) + " - image post")
+            logger.info("  #" + str(tweet_count) + " in current Twitter thread - image post.")
             downloaded = self.downloadImage(tweet, tweet_count, metadata, dir_path, SCREENSHOT)
         elif metadata["post type"] == "video":
-            logger.info("  #" + str(tweet_count) + " - video post")
+            logger.info("  #" + str(tweet_count) + " in current Twitter thread - video post.")
             downloaded = self.downloadVideo(tweet, tweet_count, metadata, dir_path, SCREENSHOT)
         else:
             return downloaded

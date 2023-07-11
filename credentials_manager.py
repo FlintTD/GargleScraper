@@ -5,6 +5,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import os.path
 import os
+import logging
+
+logger = logging.getLogger('GargleScraper')
 
 
 def get_twitter_credentials() -> dict:
@@ -20,13 +23,13 @@ def get_twitter_credentials() -> dict:
         except ValueError:
             print('Add your email, username, and password into the Twitter credentials file!')
             f.close() 
-            exit(0)
+            sys.exit()
         credentials[key] = value.rstrip(" \n")
     
     if len(credentials[key]) == 0:
         raise ValueError('Add your email, username, and password into the Twitter credentials file!')
         f.close()
-        exit(0)
+        sys.exit()
     
     f.close()
     return credentials
@@ -55,7 +58,7 @@ def get_gmail_credentials() -> dict:
     if os.path.exists(path_to_gmail_uat):
         # Read the user access token from the file.
         user_access_token = Credentials.from_authorized_user_file(path_to_gmail_uat, SCOPES)
-        print("Gmail user access token found!")
+        logger.info("Gmail user access token found!")
 
     # If there is no (valid) user access token available, ask the user to log in.
     if not user_access_token or not user_access_token.valid:
@@ -71,8 +74,8 @@ def get_gmail_credentials() -> dict:
                 user_access_token = flow.run_local_server(port=0)
             else:
                 # If there are no google secrets available, ask the user to log in.
-                print("No Gmail user access token or Google secrets found!  Check the README to see how to provide Google secrets.")
-                quit()
+                print("No Gmail user access token or Google secrets found! Check the README to see how to provide Google secrets.")
+                sys.exit()
   
         # Save the user access token in gmail_token.json file for the next run.
         with open(path_to_gmail_uat, 'w') as token:
