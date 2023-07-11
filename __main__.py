@@ -82,7 +82,7 @@ def isThisPostArchived(url):
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hu:gf:p:v:s",["help","url=","gmail","file=","postlimit=","verbosity=","screenshot"])
+    opts, args = getopt.getopt(argv,"hu:f:gp:v:s",["help","url=","file=","gmail","postlimit=","verbosity=","screenshot"])
     urls = []
     USE_URL = False
     USE_GMAIL = False
@@ -99,6 +99,7 @@ def main(argv):
             # Print out the help text.
             print('HELP TEXT:')
             print('  __main__.py -u <URL to media>    (overrides Gmail integration)')
+            print('  __main__.py -f <path to file>    (overrides Gmail integration)')
             print('  __main__.py -g      (engages Gmail integration)')
             print('  __main__.py -p <Post limit>')
             print('  __main__.py -v      (sets the verbosity of the logs printed to console)')
@@ -163,8 +164,20 @@ def main(argv):
     # Ingest a list of URLs to scrape.
     if USE_URL is True:
         logger.info("Scraping URL from command-line arguement...")
-    elif USE_GMAIL is True and USE_CSV is True:
-        print("Cannot scrape from Gmail and a File simultaneously!")
+    elif USE_CSV is True:
+        file_extension = os.path.splitext(FILEPATH)
+        if file_extension[1] == ".csv":
+            logger.info("Scraping URLs from a file...")
+            urls = []
+            with open(FILEPATH, mode='r') as csv_file:
+                csv_reader = csv.reader(csv_file)
+                for line in csv_reader:
+                    for entry in line:
+                        if looksLikeAURL(entry):
+                            urls.append(entry)
+        else:
+            print("ERROR: Bad file type! The given file must be a CSV file!")
+            sys.exit()
     elif USE_GMAIL is True:
         logger.info("Scraping emails from Gmail...")
         # Prep Gmail account.
@@ -196,20 +209,6 @@ def main(argv):
             emailBody = gmail_account.getEmailBodyFromEmail(email)
             if emailBody is not None:
                 urls = sanitizeEmailBody(emailBody)
-    elif USE_CSV is True:
-        file_extension = os.path.splitext(FILEPATH)
-        if file_extension[1] == ".csv":
-            logger.info("Scraping URLs from a file...")
-            urls = []
-            with open(FILEPATH, mode='r') as csv_file:
-                csv_reader = csv.reader(csv_file)
-                for line in csv_reader:
-                    for entry in line:
-                        if looksLikeAURL(entry):
-                            urls.append(entry)
-        else:
-            print("ERROR: Bad file type! The given file must be a CSV file!")
-            sys.exit()
     
     if POST_LIMIT == -1:
         logger.error("Warning! Scraping without a post limit risks exceeding your daily post cap!")
