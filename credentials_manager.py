@@ -58,7 +58,7 @@ def get_gmail_credentials() -> dict:
     if os.path.exists(path_to_gmail_uat):
         # Read the user access token from the file.
         user_access_token = Credentials.from_authorized_user_file(path_to_gmail_uat, SCOPES)
-        logger.info("Gmail user access token found!")
+        logger.debug("Gmail user access token found!")
 
     # If there is no (valid) user access token available, ask the user to log in.
     if not user_access_token or not user_access_token.valid:

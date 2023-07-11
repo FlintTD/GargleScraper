@@ -6,8 +6,10 @@ from googleapiclient.errors import HttpError
 import os.path
 import base64
 import email
+import logging
 #from bs4 import BeautifulSoup
 
+logger = logging.getLogger('GargleScraper')
 # Define the SCOPES. If modifying it, delete the token.pickle file.
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
@@ -51,6 +53,7 @@ class GmailAccount():
             # TODO(developer) - Handle errors from gmail API.
             print(f'An error occurred when getting all unread email IDs: {error}')
         
+        logger.debug("Gmail emails retrieved!")
         return messages
 
     def getEmailFromMessageId(self, message_id):

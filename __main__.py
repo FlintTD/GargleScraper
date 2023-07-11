@@ -202,7 +202,6 @@ def main(argv):
 
         # Get the IDs of all unread emails with the label: The Gargle.
         unread_message_ids = gmail_account.getUnreadMessageIds("The Gargle")
-        logger.info("Gmail emails retrieved!")
 
         #print(unread_message_ids[0])
         
