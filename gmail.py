@@ -47,7 +47,10 @@ class GmailAccount():
         messages = None
         
         try:
-            messagesResult = self.service.users().messages().list(userId='me', q=f'in:{label} is:unread').execute()
+            # The MaxResults value is the maximum number of emails which will be retrieved.
+            # The default value is 100.
+            max_results = 200
+            messagesResult = self.service.users().messages().list(maxResults=max_results, userId='me', q=f'in:{label} is:unread').execute()
             messages = messagesResult.get('messages', [])
         except HttpError as error:
             # TODO(developer) - Handle errors from gmail API.

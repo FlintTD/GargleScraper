@@ -388,7 +388,7 @@ class TwitterScraper():
         
         # Generate download directory name.
         datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-        disallowed_characters = ['#','%','&','{','}','\\','<','>','*','?','/',' ','$','!','\'','\"',':','@','+','`','|','=']
+        disallowed_characters = ['#','%','&','{','}','\\','<','>','*','?','/',' ','$','!','\'','\"',':','@','+','`','|','=', '\n']
         sanitized_id = "".join(filter(lambda char: char not in disallowed_characters , text))
         dir_name = datestring + "__" + sanitized_id[0:16]
         path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(metadata["author"], dir_name))
@@ -812,7 +812,7 @@ class YDLScraperHelper:
     
     
     def download(self, url):
-        print("  Downloading video with youtube-dl...")
+        logger.debug("Downloading video with youtube-dl, URL: " + url)
         with youtube_dl.YoutubeDL(self.options) as ydl:
             ydl.download([url])
 
