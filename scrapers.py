@@ -383,7 +383,7 @@ class TwitterScraper():
                     text = text + "\n" + "\n"
             
         except NoSuchElementException as e:
-            print("  Cannot find text in the base Tweet, using placeholder for directory name.")
+            logger.debug("  Cannot find text in the base Tweet, using placeholder for directory name.")
             text = "mediaOnly"
         
         # Generate download directory name.
@@ -486,7 +486,7 @@ class TwitterScraper():
                     text = text + "\n" + "\n"
         
         except NoSuchElementException as e:
-            print("  No text accompanies this image post.")
+            logger.debug("  No text accompanies this image post.")
             text = ""
         
         try:

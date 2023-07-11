@@ -6,6 +6,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import sys
 import os
+import csv
 import json
 import getopt
 import re
@@ -19,6 +20,15 @@ USE_URL = False
 working_dir = os.path.dirname(__file__)
 relative_path_to_archive = "Archive"
 path_to_archive = os.path.join(working_dir, relative_path_to_archive)
+
+
+# Identify if a string appears to be a valid URLs.
+def looksLikeAURL(string):
+    regex = r"(http|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"
+    if re.search(regex, string) is not None:
+        return True
+    else:
+        return False
 
 
 def sanitizeEmailBody(emailBody):
@@ -65,17 +75,19 @@ def isThisPostArchived(url):
     else:
         return False
     return False 
-   
+
    
 #def scrapeFromDeviantart: 
     # Use the DeviantArt Scraper.
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hu:gp:v:s",["help","url=","gmail","postlimit=","verbosity=","screenshot"])
+    opts, args = getopt.getopt(argv,"hu:gf:p:v:s",["help","url=","gmail","file=","postlimit=","verbosity=","screenshot"])
     urls = []
     USE_URL = False
     USE_GMAIL = False
+    USE_CSV = False
+    FILEPATH = ""
     POST_LIMIT = -1
     POSTS_VIEWED = 0
     VERBOSE = False
@@ -101,6 +113,14 @@ def main(argv):
         
         elif opt in ('-g', '--gmail'):
             USE_GMAIL = True
+        
+        elif opt in ('-f', '--file'):
+            USE_CSV = True
+            if os.path.exists(arg):
+                FILEPATH = arg
+            else:
+                print("The given file cannot be found!")
+                sys.exit()
         
         elif opt in ('-p', '--postlimit'):
             POST_LIMIT = int(arg)
@@ -143,6 +163,8 @@ def main(argv):
     # Ingest a list of URLs to scrape.
     if USE_URL is True:
         logger.info("Scraping URL from command-line arguement...")
+    elif USE_GMAIL is True and USE_CSV is True:
+        print("Cannot scrape from Gmail and a File simultaneously!")
     elif USE_GMAIL is True:
         logger.info("Scraping emails from Gmail...")
         # Prep Gmail account.
@@ -174,6 +196,20 @@ def main(argv):
             emailBody = gmail_account.getEmailBodyFromEmail(email)
             if emailBody is not None:
                 urls = sanitizeEmailBody(emailBody)
+    elif USE_CSV is True:
+        file_extension = os.path.splitext(FILEPATH)
+        if file_extension[1] == ".csv":
+            logger.info("Scraping URLs from a file...")
+            urls = []
+            with open(FILEPATH, mode='r') as csv_file:
+                csv_reader = csv.reader(csv_file)
+                for line in csv_reader:
+                    for entry in line:
+                        if looksLikeAURL(entry):
+                            urls.append(entry)
+        else:
+            print("ERROR: Bad file type! The given file must be a CSV file!")
+            sys.exit()
     
     if POST_LIMIT == -1:
         logger.error("Warning! Scraping without a post limit risks exceeding your daily post cap!")
