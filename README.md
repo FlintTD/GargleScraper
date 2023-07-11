@@ -71,13 +71,13 @@ To invoke the Gargle Scaper, type navigate to the Gargle Scraper's directory and
 
 **-g**, or **--gmail**: Scrapes ALL posts contained in emails with a specific Label in your Gmail server.
 
+**-f**, or **--file**: Scrapes all URLs contained within a provided file. Currently only supports CSV files.
+
 **-p**, or **--postlimit**: Sets a limit on how many posts the scraper can view before deactivating. This is *not* how many posts the scraper will download. For example, a Twitter thread requires navigating to multiple individual posts to scrape an single thread.
+
+**-v**, or **--verbosity**: Tells the scraper to be more or less detailed in its logging. Log file is GargleScraper.log.
 
 **-s**, or **--screenshot**: Tells the scraper to take a screenshot of every Tweet it scrapes. Screenshots are saved in the post's archive directory as a PNG image file.
 
 ### Unimplemented Commands
-**-v**, or **--verbose**: Tells the scraper to be more or less detailed in its logging.
-
-**-l**, or **--list**: Scrapes all posts from a provided list file. (CSV?)
-
 **-o**, or **--overwrite**: Modifier which will cause the scaper to overwrite any posts found to be already downloaded.
