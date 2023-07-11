@@ -25,7 +25,6 @@ In order to get this program up and running, you will need to install Google Chr
 
 Lastly, you will need to provide the Gargle Scraper with a bunch of login information.  That information will live in the *GargleScraper/Credentials* directory.
 
-
 ### The information you need is:
 - The email, username, and password of a functioning Twitter account (if you are scraping Twitter).  These must be stored in the file: *twitter_credentials.txt*
 - A User Access Token (UAT) for a working Gmail account.  This will be generated for you by this program, and stored in the file: *gmail_token.json*
