@@ -43,7 +43,7 @@ class TwitterScraper():
     
     
     def load(self):
-        logger.info("The Twitter scraper is opening a browser window.")
+        logger.info("The Twitter scraper is opening a browser window...")
         # Load www.twitter.com in a web browser.
         self.driver.get("http://www.twitter.com")
         # Wait until the title of the page includes the word "Twitter".

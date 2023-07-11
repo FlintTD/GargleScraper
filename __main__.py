@@ -7,6 +7,7 @@ from selenium.webdriver.common.by import By
 import sys
 import os
 import csv
+import time
 import json
 import getopt
 import re
@@ -44,7 +45,9 @@ def sanitizeEmailBody(emailBody):
 
 def whichPlatformIsUrl(url):
     # Identify which scraper to use for this URL.
-    regexTwitter = r"(https?://[^\s]*twitter.com[^\s]*)" # Works for https://www.twitter.com and https://twitter.com
+    regexTwitter = r"(https?://[^\s]*twitter.com/[^\s]*/status/[^\s]*)" # Works for https://www.twitter.com and https://twitter.com posts.
+    # Does not work for a user profile!
+    #regexTwitter = r"(https?://[^\s]*twitter.com[^\s]*)"
     regexShortTwitter = r"(https?://t.co[^\s]+)"
     regexDeviantart = r"(https?://[^\s]+deviantart.com[^\s]*)"
     
@@ -165,6 +168,10 @@ def main(argv):
     else:
         logger.setLevel('WARNING')
     
+    beginning_message = "Beginning scraping..."
+    logger.info(beginning_message)
+    print("  " + beginning_message)
+    
     # Ingest a list of URLs to scrape.
     if USE_URL is True:
         logger.info("Scraping URL from command-line arguement...")
@@ -207,10 +214,7 @@ def main(argv):
         if not unread_message_ids:
             logger.warning("  No unread messages found!")
         else:
-            urls = []
-            if POST_LIMIT > 0:
-                unread_message_ids = unread_message_ids[0:(POST_LIMIT + 1)]
-                
+            urls = [] 
             for message_id in unread_message_ids:
                 email = gmail_account.getEmailFromMessageId(message_id)
                 emailBody = gmail_account.getEmailBodyFromEmail(email)
@@ -224,12 +228,12 @@ def main(argv):
     total_posts = len(urls)
     if POST_LIMIT == -1:
         logger.error("Warning! Scraping without a post limit risks exceeding your daily post cap!")
-        total_posts = POST_LIMIT
     
     # Scrape the list of URLs.
     # For each URL, attempt scraping and archiving.
     for url in urls:
         if (POST_LIMIT == -1) or (POSTS_VIEWED < POST_LIMIT):
+            logger.info("Scraping: " + url + " ...")
             # Determine which platform the link is for.
             platform = whichPlatformIsUrl(url)
             if platform == "twitter":
@@ -238,10 +242,10 @@ def main(argv):
                         success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
-                            logger.info("Twitter Scraper archived the post at: " + url)
+                            logger.info("Twitter scraper has archived the post!")
                             post_count += 1
                         else:
-                            logger.error("Twitter Scraper failed to archive the post at: " + url)
+                            logger.error("Twitter Scraper failed to archive the post!")
                     else:
                         ACTIVE_PLATFORMS[platform] = True
                         # Prep Twitter account and scraper.
@@ -259,18 +263,19 @@ def main(argv):
                         success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
-                            logger.info("Twitter Scraper archived the post at: " + url)
+                            logger.info("Twitter scraper has archived the post!")
                             post_count += 1
                         else:
-                            logger.error("Twitter Scraper failed to archive the post at: " + url)
+                            logger.error("Twitter scraper has failed to archive the post!")
                 else:
-                    logger.info("This Tweet has already been scraped and archived: " + url)
+                    logger.info("This Tweet has already been scraped and archived!")
                     post_count += 1
             else:
-                logger.error("This website has no associated scraper: " + url)
+                logger.error("This website has no associated scraper!")
         else:
             post_limit_reached = True
             pass
+        time.sleep(0.10)
     
     # Cleanup
     if post_limit_reached:
@@ -279,7 +284,7 @@ def main(argv):
         logger.info("Posts viewed: " + str(POSTS_VIEWED))
     posts_total_message = f"Completion Rate: {post_count}/{total_posts} given posts have been archived!"
     logger.info(posts_total_message)
-    print(posts_total_message)
+    print("  " + posts_total_message)
     if ACTIVE_PLATFORMS["twitter"] is True:
         twitter_scraper.teardown()
     
