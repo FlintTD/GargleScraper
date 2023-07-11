@@ -12,26 +12,29 @@ import io
 import shutil
 import json
 import re
+import logging
 import requests
 import youtube_dl
 from datetime import datetime
 from PIL import Image
+
+logger = logging.getLogger('GargleScraper')
 
 def ydlHook(d):
         if d['status'] == 'finished':
             print('Done downloading, now converting ...')
 
 class TwitterScraper():
-    def __init__(self, email, username, password):
+    def __init__(self, archivepath, email, username, password):
         self.email = email
         self.username = username
         self.password = password
         self.working_dir = os.path.dirname(__file__)
-        self.relative_path_to_archive = "Archive"
-        self.path_to_archive = os.path.join(self.working_dir, self.relative_path_to_archive)
+        self.path_to_archive = archivepath
         self.posts_viewed = 0
         chrome_options = Options()
         chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
         self.driver = webdriver.Chrome(
             executable_path = os.path.join(os.getcwd(), 'chromedriver'),
             options = chrome_options
@@ -40,6 +43,7 @@ class TwitterScraper():
     
     
     def load(self):
+        logger.info("The Twitter scraper is opening a browser window.")
         # Load www.twitter.com in a web browser.
         self.driver.get("http://www.twitter.com")
         # Wait until the title of the page includes the word "Twitter".
@@ -47,14 +51,14 @@ class TwitterScraper():
 
     
     def login(self):
-        # Check if logging in is necessary.
+        # Check if logging in to Twitter is necessary.
         homeHeading = None
         try:
             # Check if we are already logged in
             # Does the web page have an Account button?
             accountButton = self.wait.until(EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Account menu']")))
         finally:
-            # If Home header isn't found, logging in is necessary.
+            # If Home header isn't found, logging in to Twitter is necessary.
             if accountButton is None:
                 # To log in, first navigate to the Twitter login page.
                 self.driver.get("http://www.twitter.com/login")
@@ -87,11 +91,12 @@ class TwitterScraper():
     
     
     def teardown(self):
-        print("Twitter scraper module deactivating...")
+        logger.info("The Twitter scraper module is deactivating...")
         self.driver.close()
     
     
     def goToPage(self, url):
+        logger.debug("Navigating to web page at: " + str(url))
         self.driver.get(str(url))
         self.wait.until(EC.visibility_of_element_located((By.TAG_NAME, "main")))
         self.posts_viewed += 1
@@ -108,7 +113,7 @@ class TwitterScraper():
         try:
             ActionChains(self.driver).scroll_to_element(element).perform()  # focus
             location = element.location
-            print(location)
+            logger.info("Taking screenshot of element at screen coordinates: " + str(location))
             size = element.size
             self.wait.until(EC.visibility_of(element))
             png = self.driver.get_screenshot_as_png()
@@ -121,8 +126,8 @@ class TwitterScraper():
             with open(os.path.join(dir_path, screenshot_name + ".png"), 'wb') as file:
                 im.save(file, "png")
         except Exception as e:
-            print("Error taking screenshot of web element!")
-            print(e)
+            logger.error("Error taking screenshot of web element!")
+            logger.error(e)
     
     
     def isTweetDeleted(self):
@@ -354,26 +359,6 @@ class TwitterScraper():
         
         # Return a success.
         return(metadata)
-    
-    
-    # Checks the archive for a post matching the provided URL.
-    def isThisPostArchived(self, url):
-        author_name = url.replace("https://", "").split("/")[1]
-        path_to_author_archive = os.path.join(self.path_to_archive, ("@" + author_name))
-        if os.path.exists(path_to_author_archive):
-            for directory_name in os.listdir(path_to_author_archive):
-                directorypath = os.path.join(path_to_author_archive, directory_name)
-                for file_name in os.listdir(directorypath):
-                    filepath = os.path.join(directorypath, file_name)
-                    if os.path.isfile(filepath):
-                        if "metadata.json" in file_name:
-                            json_file = open(filepath)
-                            post_metadata = json.load(json_file)
-                            if post_metadata["url"] == url:
-                                return True
-        else:
-            return False
-        return False 
     
     
     # Generates a directory path for containing the data from a Thread or single Tweet.
@@ -652,13 +637,13 @@ class TwitterScraper():
     def downloadTweet(self, tweet, tweet_count, metadata, dir_path, SCREENSHOT):
         downloaded = False
         if metadata["post type"] == "text":
-            print("  #" + str(tweet_count) + " - text post")
+            logger.info("  #" + str(tweet_count) + " - text post")
             downloaded = self.downloadText(tweet, tweet_count, metadata, dir_path, SCREENSHOT)
         elif metadata["post type"] == "image":
-            print("  #" + str(tweet_count) + " - image post")
+            logger.info("  #" + str(tweet_count) + " - image post")
             downloaded = self.downloadImage(tweet, tweet_count, metadata, dir_path, SCREENSHOT)
         elif metadata["post type"] == "video":
-            print("  #" + str(tweet_count) + " - video post")
+            logger.info("  #" + str(tweet_count) + " - video post")
             downloaded = self.downloadVideo(tweet, tweet_count, metadata, dir_path, SCREENSHOT)
         else:
             return downloaded
@@ -707,7 +692,7 @@ class TwitterScraper():
         
         # Check to see if the tweet has been deleted.
         if self.isTweetDeleted():
-            print("  This Tweet from Twitter has been deleted!")
+            logger.warning("  This Tweet from Twitter has been deleted!")
             return False, self.posts_viewed
         
         # Determine the Tweets to download from a Thread on a page.
@@ -718,7 +703,7 @@ class TwitterScraper():
         # If the directory already exists, this Tweet (or exact slice of a Thread tree) has already been downloaded.
         if os.path.exists(dir_path):
             # Skip downloading this post.
-            print("  This Tweet or Thread from Twitter has already been downloaded!")
+            logger.warning("  This Tweet or Thread from Twitter has already been downloaded!")
             return False, self.posts_viewed
         else:
             # Create the post's archive directory.
@@ -790,11 +775,11 @@ class TwitterScraper():
                 
         
     # Download each Quote tweet saved for later download.
-        print("  Scraping queue of deferred tweets...")
+        logger.info("  Scraping queue of deferred tweets...")
         for tweet in queue_to_scrape_individually:
             self.scrapeOnlyThisTweet(tweet["url"], tweet["count"], tweet['metadata'], dir_path, SCREENSHOT)
             self.goBackAPage()
-        print("  ...done!")
+        logger.info("  ...done!")
     
     # TODO: Attempt to download the thread's metadata.
         

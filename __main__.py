@@ -5,6 +5,8 @@ from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 import sys
+import os
+import json
 import getopt
 import re
 import logging
@@ -14,6 +16,10 @@ SCREENSHOT = False
 ACTIVE_PLATFORMS = {"twitter": False, "deviantart": False, "pixiv": False, "imgur": False}
 USE_GMAIL = False
 USE_URL = False
+working_dir = os.path.dirname(__file__)
+relative_path_to_archive = "Archive"
+path_to_archive = os.path.join(working_dir, relative_path_to_archive)
+
 
 def sanitizeEmailBody(emailBody):
     # Identify all URLs in a provided string.
@@ -23,6 +29,7 @@ def sanitizeEmailBody(emailBody):
     # Remove empty strings from list of URLs.
     urls = [s for s in urls if s]
     return urls
+
 
 def whichPlatformIsUrl(url):
     # Identify which scraper to use for this URL.
@@ -38,13 +45,34 @@ def whichPlatformIsUrl(url):
         return "deviantart"
     else:
         return None
-    
+
+
+# Checks the archive for a post matching the provided URL.
+def isThisPostArchived(url):
+    author_name = url.replace("https://", "").split("/")[1]
+    path_to_author_archive = os.path.join(path_to_archive, ("@" + author_name))
+    if os.path.exists(path_to_author_archive):
+        for directory_name in os.listdir(path_to_author_archive):
+            directorypath = os.path.join(path_to_author_archive, directory_name)
+            for file_name in os.listdir(directorypath):
+                filepath = os.path.join(directorypath, file_name)
+                if os.path.isfile(filepath):
+                    if "metadata.json" in file_name:
+                        json_file = open(filepath)
+                        post_metadata = json.load(json_file)
+                        if post_metadata["url"] == url:
+                            return True
+    else:
+        return False
+    return False 
+   
+   
 #def scrapeFromDeviantart: 
     # Use the DeviantArt Scraper.
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hu:gp:vs",["help","url=","gmail","postlimit=","verbose","screenshot"])
+    opts, args = getopt.getopt(argv,"hu:gp:v:s",["help","url=","gmail","postlimit=","verbosity=","screenshot"])
     urls = []
     USE_URL = False
     USE_GMAIL = False
@@ -61,8 +89,8 @@ def main(argv):
             print('  __main__.py -u <URL to media>    (overrides Gmail integration)')
             print('  __main__.py -g      (engages Gmail integration)')
             print('  __main__.py -p <Post limit>')
-            print('  __main__.py -v      (enables verbose logging)')
-            print('  __main__.py -s      (enables screenshots of posts)')
+            print('  __main__.py -v      (sets the verbosity of the logs printed to console)')
+            print('  __main__.py -s      (collects screenshots of posts)')
             # Exit the Gargle Scraper.
             sys.exit()
         
@@ -78,16 +106,45 @@ def main(argv):
             POST_LIMIT = int(arg)
         
         elif opt in ('-v', '--verbose'):
-            VERBOSE = True
+            VERBOSE = arg.lower()
+            if VERBOSE not in ("debug", "info", "warning", "error", "critical"):
+                print("The given logging level '" + arg + "' is not valid. Please select one of the following options:")
+                print("    DEBUG, INFO, WARNING, ERROR, CRITICAL")
+                # Exit the Gargle Scraper.
+                sys.exit()
         
         elif opt in ('-s', '--screenshot'):
             SCREENSHOT = True
     
+    # Configure logging.
+    # Create logger.
+    # (Make sure to tell all future loggers across all modules to "GargleScraper" as below.)
+    logger = logging.getLogger('GargleScraper')
+    # Set log formatting.
+    log_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Create log file handler.
+    log_file_handler = logging.FileHandler("GargleScraper.log", 'w', 'utf-8')
+    log_file_handler.setFormatter(log_format)
+    logger.addHandler(log_file_handler)
+    # Set logging level.
+    if VERBOSE == "debug":
+        logger.setLevel('DEBUG')
+    elif VERBOSE == "info":
+        logger.setLevel('INFO')
+    elif VERBOSE == "warning":
+        logger.setLevel('WARNING')
+    elif VERBOSE == "error":
+        logger.setLevel('ERROR')
+    elif VERBOSE == "critical":
+        logger.setLevel('CRITICAL')
+    else:
+        logger.setLevel('WARNING')
+    
     # Ingest a list of URLs to scrape.
     if USE_URL is True:
-        print("Scraping URL from command-line arguement...")
+        logger.info("Scraping URL from command-line arguement...")
     elif USE_GMAIL is True:
-        print("Scraping emails from Gmail...")
+        logger.info("Scraping emails from Gmail...")
         # Prep Gmail account.
         gmail_credentials = credentials_manager.get_gmail_credentials()
         gmail_account = gmail.GmailAccount(gmail_credentials)
@@ -95,7 +152,7 @@ def main(argv):
         # Log in to Gmail account and get the emailed links.
         gmail_account.login()
         if gmail_account.service == None:
-            exit()
+            sys.exit()
 
         # Get the IDs of all unread emails with the label: The Gargle.
         unread_message_ids = gmail_account.getUnreadMessageIds("The Gargle")
@@ -109,17 +166,17 @@ def main(argv):
         #     If the content is not available, mark the email as Read (and flag it Red somehow).
         #   Move on to the next email.
         if not unread_message_ids:
-            print("  No unread messages found!")
+            logger.warning("  No unread messages found!")
         else:
             #for id in unread_message_ids:
             email = gmail_account.getEmailFromMessageId(unread_message_ids[0])
-            #print(email)
+            logger.info(email)
             emailBody = gmail_account.getEmailBodyFromEmail(email)
             if emailBody is not None:
                 urls = sanitizeEmailBody(emailBody)
     
     if POST_LIMIT == -1:
-        print("Warning!  Scraping without a post limit risks exceeding your daily post cap!")
+        logger.error("Warning! Scraping without a post limit risks exceeding your daily post cap!")
     
     # Scrape the list of URLs.
     # For each URL, attempt scraping and archiving.
@@ -128,52 +185,52 @@ def main(argv):
             # Determine which platform the link is for.
             platform = whichPlatformIsUrl(url)
             if platform == "twitter":
-                if ACTIVE_PLATFORMS[platform] is True:
-                    if not twitter_scraper.isThisPostArchived(url):
+                if not isThisPostArchived(url):
+                    if ACTIVE_PLATFORMS[platform] is True:
                         success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
-                        if not success:
-                            logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
+                        if success:
+                            logger.info("Twitter Scraper archived the post at: " + url)
+                        else:
+                            logger.error("Twitter Scraper failed to archive the post at: " + url)
                     else:
-                        print("This Tweet has already been scraped and archived!")
-                else:
-                    ACTIVE_PLATFORMS[platform] = True
-                    # Prep Twitter account and scraper.
-                    twitter_credentials = credentials_manager.get_twitter_credentials()
-                    twitter_scraper = scrapers.TwitterScraper(
-                                        twitter_credentials['email'],
-                                        twitter_credentials['username'],
-                                        twitter_credentials['password']
-                                        )
-                    
-                    if not twitter_scraper.isThisPostArchived(url):
+                        ACTIVE_PLATFORMS[platform] = True
+                        # Prep Twitter account and scraper.
+                        twitter_credentials = credentials_manager.get_twitter_credentials()
+                        twitter_scraper = scrapers.TwitterScraper(
+                                            path_to_archive,
+                                            twitter_credentials['email'],
+                                            twitter_credentials['username'],
+                                            twitter_credentials['password']
+                                            )
                         # Open the Twitter home page.
                         twitter_scraper.load()
                         twitter_scraper.login()
                         # Scrape the Twitter post.
                         success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
-                        if not success:
-                            #logger.log(url, "FAILED", "Twitter Scraper failed to get the post.")
-                            pass
-                    else:
-                        print("This Tweet has already been scraped and archived!")
+                        if success:
+                            logger.info("Twitter Scraper archived the post at: " + url)
+                        else:
+                            logger.error("Twitter Scraper failed to archive the post at: " + url)
+                else:
+                    logger.warning("This Tweet has already been scraped and archived!")
             else:
-                logger.log(url, "SKIPPED", "Website has no associated scraper.")
+                logger.error("This website has no associated scraper: " + url)
         else:
             post_limit_reached = True
             pass
     
     # Cleanup
     if post_limit_reached:
-        print("Post limit reached!  Some posts remain unscraped!")
+        logger.warning("Post limit reached! Some posts remain unscraped!")
     else:
-        print("Posts viewed: " + str(POSTS_VIEWED))
+        logger.info("Posts viewed: " + str(POSTS_VIEWED))
     if ACTIVE_PLATFORMS["twitter"] is True:
         twitter_scraper.teardown()
     
     # Exit the Gargle Scraper once the main function is complete, even if no other exit conditions are met.
-    print("  Gargle Scraper is now closing...")
+    logger.info("Gargle Scraper is now closing...")
     sys.exit()
 
 if __name__ == "__main__":
