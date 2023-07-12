@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as secretdriver
 import time
 import os
 import io
@@ -27,17 +28,27 @@ class DeviantartScraper():
         self.username = username
         self.password = password
         self.working_dir = os.path.dirname(__file__)
+        
         # Set up Chromedriver.
         chrome_options = Options()
         chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
         chrome_options.add_argument("--disable-extensions")
+        # Argument to disable the AutomationControlled flag.
+        #chrome_options.add_argument("--disable-blink-features=AutomationControlled") 
+        # Exclude the collection of enable-automation switches. 
+        #chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        # Turn-off userAutomationExtension 
+        #chrome_options.add_experimental_option("useAutomationExtension", False)
         #chrome_options.add_argument("--headless")
-        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
-        self.driver = webdriver.Chrome(
+        #chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
+        self.driver = secretdriver.Chrome(
             executable_path = os.path.join(os.getcwd(), 'chromedriver'),
             options = chrome_options
         )
-        self.wait = WebDriverWait(self.driver, 10, poll_frequency=1, ignored_exceptions=[ElementNotVisibleException, ElementNotSelectableException])
+        # Changing the property of the navigator value for webdriver to undefined 
+        self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        
+        self.wait = WebDriverWait(self.driver, 5, poll_frequency=1, ignored_exceptions=[ElementNotVisibleException, ElementNotSelectableException])
     
     
     def load(self):
@@ -46,17 +57,19 @@ class DeviantartScraper():
         self.driver.get("http://www.deviantart.com")
         # Wait until the title of the page includes the word "DeviantArt".
         dummy = self.wait.until(EC.title_contains("DeviantArt"))
+        time.sleep(2 + 2 * random.random())
     
     
     def mimicTyping(self, element, string):
         for char in string:
             element.send_keys(char)
-            time.sleep((0.2 * random.random()))
+            time.sleep(0.1 + (0.4 * random.random()))
     
     
     def login(self):
         # Check if logging in to DeviantArt is necessary.
         homeHeading = None
+        time.sleep(3 + 3 * random.random())
         try:
             # Check if we are already logged in.
             # Does the web page have a User Profile button in the top left?
@@ -67,20 +80,22 @@ class DeviantartScraper():
         except:
             # If User Profile button isn't found, logging in to DeviantArt is necessary.
             # To log in, first navigate to the DeviantArt login page.
-            self.driver.get("https://www.deviantart.com/users/login")
+            login_button = self.driver.find_element(By.XPATH, ".//a[@href='https://www.deviantart.com/users/login']")
+            login_button.click()
             # Wait until the Login page loads.
             unused_login_title = self.wait.until(EC.title_contains("Log In"))
             # Enter the login username.
+            time.sleep(1 + 1.5 * random.random())
             username_textbox = self.driver.find_element(By.XPATH, "//input[@name='username']")
             self.mimicTyping(username_textbox, self.username)
-            time.sleep((0.5 * random.random()))
+            time.sleep((1 + 1.5 * random.random()))
             # Enter the login password.
             password_textbox = self.driver.find_element(By.XPATH, "//input[@name='password']")
             self.mimicTyping(password_textbox, self.password)
             # Submit the form to log in.
             try:
+                time.sleep(0.5 + 0.5 * random.random())
                 password_textbox.send_keys(Keys.RETURN)
-                time.sleep(0.5)
             
                 """
                 try:
@@ -101,7 +116,7 @@ class DeviantartScraper():
                 
                 # Wait until the Home page loads.
                 #input("Press Enter to continue...")
-                unusedHomeTitle = self.wait.until(EC.visibility_of_element_located((By.LINK_TEXT, "Home")))
+                accountButton = self.wait.until(EC.presence_of_element_located((By.XPATH, f"//a[@data-username='{self.username}']")))
             except Exception as e:
                 logger.error("The scraper has failed to log in to DeviantArt!")
                 logger.error(e)
@@ -115,14 +130,19 @@ class DeviantartScraper():
     
     def goToPage(self, url):
         logger.debug("Navigating to web page at: " + str(url))
+        time.sleep(4 + 2.5 * random.random())
         self.driver.get(str(url))
         self.wait.until(EC.visibility_of_element_located((By.XPATH, "//a[@aria-label='DeviantArt - Home']")))
+        time.sleep(0.5 + 1.5 * random.random())
         #time.sleep(1)
     
     
     def goBackAPage(self):
+        logger.debug("Going back to the previous web page.")
+        time.sleep(0.5 + 0.5 * random.random())
         self.driver.back()
         self.wait.until(EC.visibility_of_element_located((By.XPATH, "//a[@aria-label='DeviantArt - Home']")))
+        time.sleep(0.5 + 1.5 * random.random())
         #time.sleep(1)
     
     
@@ -147,6 +167,7 @@ class DeviantartScraper():
             logger.error(e)
     
     
+    # TODO
     def isDeviationDeleted(self):
         deleted = False
         return deleted
@@ -273,6 +294,8 @@ class DeviantartScraper():
             if SCREENSHOT:
                 self.screenshot(deviation_text, dir_path, filename)
                 self.screenshot(author_comments, dir_path, (filename + "__comments"))
+            
+            return True
         
         except NoSuchElementException as e:
             logger.error("  Error downloading text from DeviantArt!")
@@ -296,7 +319,6 @@ class DeviantartScraper():
             return downloaded
         
         return downloaded
-        
     
     
     # Download the full data and metadata of a Deviation.
@@ -332,14 +354,17 @@ class DeviantartScraper():
         if dir_path == False:
             return False
     
-    # Download the Deviation.
+    # Download the Deviation and author comments.
         if media_type == False:
             return False
         else:
             deviation.metadata["post type"] = media_type
-        self.downloadDeviation(deviation, dir_path, SCREENSHOT)
+        if not self.downloadDeviation(deviation, dir_path, SCREENSHOT):
+            # Delete the post's archive directory.
+            shutil.rmtree(dir_path)
+            return False
         
-    # Scrape the artist's comments.
+        time.sleep(2 + 2 * random.random())
         return True
         
     
