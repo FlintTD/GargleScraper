@@ -590,9 +590,9 @@ class TwitterScraper():
             video = videoblock.find_elements(By.XPATH, ".//video[@aria-label='Embedded video']")
             self.wait.until(EC.visibility_of(videoblock))
             
-            username_block = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
+            # Locate the direct link to the Tweet on the page, by checking the datestamp link.
             date = tweet.find_element(By.TAG_NAME, 'time').text
-            direct_tweet_link = username_block.find_element(By.XPATH, ".//a[@aria-label='" + date + "']").get_attribute("href")
+            direct_tweet_link = tweet.find_element(By.XPATH, ".//a[@aria-label='" + date + "']").get_attribute("href")
             
             datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
             
@@ -616,11 +616,7 @@ class TwitterScraper():
             video_filename = filename + ".mp4"
             ydl_opts = {'outtmpl': os.path.join(path_to_download_dir, video_filename)}
             y_downloader = YDLScraperHelper(ydl_opts)
-            try:
-                y_downloader.download(direct_tweet_link)
-            except Exception as e:
-                print("  Error downloading video from Twitter!")
-                print(e)
+            if not y_downloader.download(direct_tweet_link):
                 return(False)
             
             # Return a success.
@@ -811,10 +807,19 @@ class YDLScraperHelper:
             self.options.update(options)
     
     
+    # Trys to download the video from the given URL, as a side effect.
+    # Returns True if successful, and False if not.
     def download(self, url):
-        logger.debug("Downloading video with youtube-dl, URL: " + url)
-        with youtube_dl.YoutubeDL(self.options) as ydl:
-            ydl.download([url])
+        try:
+            logger.debug("Downloading video with youtube-dl, URL: " + url)
+            with youtube_dl.YoutubeDL(self.options) as ydl:
+                ydl.download([url])
+        except Exception as e:
+            logger.error(e)
+            return False
+        
+        logger.debug("Video download successful!")
+        return True
 
 
 """
