@@ -26,12 +26,13 @@ def ydlHook(d):
 
 class TwitterScraper():
     def __init__(self, archivepath, email, username, password):
+        self.path_to_archive = archivepath
         self.email = email
         self.username = username
         self.password = password
         self.working_dir = os.path.dirname(__file__)
-        self.path_to_archive = archivepath
         self.posts_viewed = 0
+        # Set up Chromedriver.
         chrome_options = Options()
         chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
@@ -52,7 +53,6 @@ class TwitterScraper():
     
     def login(self):
         # Check if logging in to Twitter is necessary.
-        homeHeading = None
         try:
             # Check if we are already logged in
             # Does the web page have an Account button?
