@@ -77,7 +77,7 @@ class TwitterScraper():
                     #verificationTextBox = self.driver.find_element(By.NAME, "text")
                     verificationTextBox.send_keys(self.username)
                     verificationTextBox.send_keys(Keys.RETURN)
-                    print("Verified!")
+                    logger.debug("Verified!")
                 finally:
                     # Enter the login password.
                     self.wait.until(EC.visibility_of_element_located((By.NAME, "password")))
@@ -325,7 +325,7 @@ class TwitterScraper():
             # Record the author's handle.
             author_names = tweet.find_element(By.XPATH, ".//div[@data-testid='User-Name']")
             author = author_names.find_element(By.TAG_NAME, "a").get_attribute("href")
-            metadata["author"] = author.replace("https://twitter.com/", "@")
+            metadata["author"] = author.replace("https://twitter.com/", "")
             
             # Record the time the Tweet was posted.
             timestring = tweet.find_element(By.TAG_NAME, 'time').get_attribute("datetime")
@@ -349,7 +349,7 @@ class TwitterScraper():
                 # Record this is not the base tweet.
                 metadata["base_tweet"] = False
             
-            # Record the time the tweet was scraped.
+            # Record the time the Tweet was scraped.
             metadata["time of scrape"] = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         
         except NoSuchElementException as e:
@@ -452,7 +452,7 @@ class TwitterScraper():
             with open(os.path.join(path_to_download_dir, (filename + ".txt")), 'w', encoding="utf-8") as file:
                 file.write(text)
             
-            # If the Screenshot flag is set, take a screenshot of the Tweet as well.
+        # If the Screenshot flag is set, take a screenshot of the Tweet as well.
             if SCREENSHOT:
                 self.screenshot(tweet, path_to_download_dir, filename)
             
