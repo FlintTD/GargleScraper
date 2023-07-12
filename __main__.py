@@ -1,5 +1,5 @@
 import gmail
-import scrapers
+import twitter_scraper
 import credentials_manager
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -239,7 +239,7 @@ def main(argv):
             if platform == "twitter":
                 if not isThisPostArchived(url):
                     if ACTIVE_PLATFORMS[platform] is True:
-                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
+                        success, additional_posts_viewed = t_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
                             logger.info("Twitter scraper has archived the post!")
@@ -250,17 +250,17 @@ def main(argv):
                         ACTIVE_PLATFORMS[platform] = True
                         # Prep Twitter account and scraper.
                         twitter_credentials = credentials_manager.get_twitter_credentials()
-                        twitter_scraper = scrapers.TwitterScraper(
+                        t_scraper = twitter_scraper.TwitterScraper(
                                             path_to_archive,
                                             twitter_credentials['email'],
                                             twitter_credentials['username'],
                                             twitter_credentials['password']
                                             )
                         # Open the Twitter home page.
-                        twitter_scraper.load()
-                        twitter_scraper.login()
+                        t_scraper.load()
+                        t_scraper.login()
                         # Scrape the Twitter post.
-                        success, additional_posts_viewed = twitter_scraper.scrapeFromTwitter(url, SCREENSHOT)
+                        success, additional_posts_viewed = t_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
                             logger.info("Twitter scraper has archived the post!")
@@ -285,7 +285,7 @@ def main(argv):
     logger.info(posts_total_message)
     print("  " + posts_total_message)
     if ACTIVE_PLATFORMS["twitter"] is True:
-        twitter_scraper.teardown()
+        t_scraper.teardown()
     
     # Exit the Gargle Scraper once the main function is complete, even if no other exit conditions are met.
     logger.info("Gargle Scraper is now closing...")
