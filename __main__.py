@@ -1,5 +1,6 @@
 import gmail
 import twitter_scraper
+import deviantart_scraper
 import credentials_manager
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -64,7 +65,7 @@ def whichPlatformIsUrl(url):
 # Checks the archive for a post matching the provided URL.
 def isThisPostArchived(url):
     author_name = url.replace("https://", "").split("/")[1]
-    path_to_author_archive = os.path.join(path_to_archive, ("@" + author_name))
+    path_to_author_archive = os.path.join(path_to_archive, author_name)
     if os.path.exists(path_to_author_archive):
         for directory_name in os.listdir(path_to_author_archive):
             directorypath = os.path.join(path_to_author_archive, directory_name)
@@ -236,16 +237,18 @@ def main(argv):
             logger.info("Scraping: " + url + " ...")
             # Determine which platform the link is for.
             platform = whichPlatformIsUrl(url)
+            # -------- Twitter --------
             if platform == "twitter":
                 if not isThisPostArchived(url):
                     if ACTIVE_PLATFORMS[platform] is True:
+                        # Scrape the Twitter post.
                         success, additional_posts_viewed = t_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         if success:
                             logger.info("Twitter scraper has archived the post!")
                             post_count += 1
                         else:
-                            logger.error("Twitter Scraper failed to archive the post!")
+                            logger.error("Twitter scraper failed to archive the post!")
                     else:
                         ACTIVE_PLATFORMS[platform] = True
                         # Prep Twitter account and scraper.
@@ -269,6 +272,32 @@ def main(argv):
                             logger.error("Twitter scraper has failed to archive the post!")
                 else:
                     logger.info("This Tweet has already been scraped and archived!")
+                    post_count += 1
+            # -------- DeviantArt --------
+            elif platform == "deviantart":
+                if not isThisPostArchived(url):
+                    if ACTIVE_PLATFORMS[platform] is False:
+                        ACTIVE_PLATFORMS[platform] = True
+                        # Prep DeviantArt account and scraper.
+                        deviantart_credentials = credentials_manager.get_deviantart_credentials()
+                        d_scraper = deviantart_scraper.DeviantartScraper(
+                                            path_to_archive,
+                                            deviantart_credentials['username'],
+                                            deviantart_credentials['password']
+                                            )
+                        # Open the DeviantArt home page.
+                        d_scraper.load()
+                        d_scraper.login()
+                        
+                    # Scrape the DeviantArt post.
+                    success = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
+                    if success:
+                        logger.info("DeviantArt scraper has archived the post!")
+                        post_count += 1
+                    else:
+                        logger.error("DeviantArt scraper failed to archive the post!")
+                else:
+                    logger.info("This Deviation has already been scraped and archived!")
                     post_count += 1
             else:
                 logger.error("This website has no associated scraper!")

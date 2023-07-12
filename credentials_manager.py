@@ -10,6 +10,31 @@ import logging
 logger = logging.getLogger('GargleScraper')
 
 
+def get_deviantart_credentials() -> dict:
+    working_dir = os.path.dirname(__file__)
+    relative_path_to_creds = "Credentials/deviantart_credentials.txt"
+    path_to_creds = os.path.join(working_dir, relative_path_to_creds)
+    credentials = dict()
+    
+    f = open(path_to_creds, "r")
+    for line in f:
+        try:
+            key, value = line.split(": ")
+        except ValueError:
+            print('Add your username and password into the DeviantArt credentials file!')
+            f.close() 
+            sys.exit()
+        credentials[key] = value.rstrip(" \n")
+    
+    if len(credentials[key]) == 0:
+        raise ValueError('Add your username and password into the DeviantArt credentials file!')
+        f.close()
+        sys.exit()
+    
+    f.close()
+    return credentials
+
+
 def get_twitter_credentials() -> dict:
     working_dir = os.path.dirname(__file__)
     relative_path_to_creds = "Credentials/twitter_credentials.txt"
