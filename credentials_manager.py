@@ -6,6 +6,8 @@ from googleapiclient.errors import HttpError
 import os.path
 import os
 import logging
+import json
+from datetime import datetime
 
 logger = logging.getLogger('GargleScraper')
 
@@ -81,9 +83,17 @@ def get_gmail_credentials() -> dict:
     
     # Check if gmail user access token exists, in form of gmail_token.json.
     if os.path.exists(path_to_gmail_uat):
-        # Read the user access token from the file.
-        user_access_token = Credentials.from_authorized_user_file(path_to_gmail_uat, SCOPES)
-        logger.debug("Gmail user access token found!")
+        expiry_date = ""
+        with open(path_to_gmail_uat) as json_uat:
+            dict_uat = json.load(json_uat)
+            expiry_date = datetime.strptime(dict_uat["expiry"], "%Y-%m-%dT%H:%M:%S.%fZ")
+        if expiry_date < datetime.now():
+            # Delete the user access token to have it regenerated.
+            os.remove(path_to_gmail_uat)
+        else:
+            # Read the user access token from the file.
+            user_access_token = Credentials.from_authorized_user_file(path_to_gmail_uat, SCOPES)
+            logger.debug("Gmail user access token found!")
 
     # If there is no (valid) user access token available, ask the user to log in.
     if not user_access_token or not user_access_token.valid:
