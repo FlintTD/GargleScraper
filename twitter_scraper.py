@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 import time
 import os
 import io
@@ -33,11 +34,12 @@ class TwitterScraper():
         self.working_dir = os.path.dirname(__file__)
         self.posts_viewed = 0
         # Set up Chromedriver.
+        # Old Chromedriver without undetected-chromedriver
         chrome_options = Options()
         chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
         self.driver = webdriver.Chrome(
-            executable_path = os.path.join(os.getcwd(), 'chromedriver'),
+            service = Service(executable_path = os.path.join(os.getcwd(), 'chromedriver')),
             options = chrome_options
         )
         self.wait = WebDriverWait(self.driver, 10, poll_frequency=1, ignored_exceptions=[ElementNotVisibleException, ElementNotSelectableException])
