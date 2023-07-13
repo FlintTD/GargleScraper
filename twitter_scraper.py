@@ -428,23 +428,30 @@ class TwitterScraper():
     #   String is the downloaded text, or None if download failed.
     #   JSON is the post metadata, or None if download failed.
     def downloadText(self, tweet, tweet_number, metadata, path_to_download_dir, SCREENSHOT):
-        try:
         # Locate the text in the Tweet.
+        try:
             textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of the xpath means "search the children of this element".
             textblock_children_list = textblock.find_elements(By.XPATH, "*")
-            
-        # Parse the text within the tweet.
-            text = ""
-            for element in textblock_children_list:
-                text = text + element.text
-                if element.tag_name == "img":  # Check for Emojis (which are SVG images on Twitter)
-                    text = text + element.get_attribute("alt")
-                elif element.text == "":
-                    text = text + "\n" + "\n"
         
-            datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+        except NoSuchElementException as e:
+            logger.error("Error finding Tweet text in Twitter's HTML!")
+            logger.error(e)
+            # Return a failure.
+            return(False)
+        
+        # Parse the text within the tweet.
+        text = ""
+        for element in textblock_children_list:
+            text = text + element.text
+            if element.tag_name == "img":  # Check for Emojis (which are SVG images on Twitter)
+                text = text + element.get_attribute("alt")
+            elif element.text == "":
+                text = text + "\n" + "\n"
+    
+        datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
             
         # Try to download the post.
+        try:
             # Try to save the post's metadata.
             if self.downloadMetadata(metadata, path_to_download_dir, tweet_number) is False:
                 return(False)
@@ -489,11 +496,11 @@ class TwitterScraper():
                     text = text + "\n" + "\n"
         
         except NoSuchElementException as e:
-            logger.debug("  No text accompanies this image post.")
+            logger.debug("No text accompanies this image post.")
             text = ""
         
-        try:
         # Locate the image/s in Twitter.
+        try:
             images_to_archive = []
             self.wait.until(EC.visibility_of_element_located((By.XPATH, ".//div[@data-testid='tweetPhoto']")))
             imageblock = tweet.find_elements(By.XPATH, ".//div[@data-testid='tweetPhoto']")
@@ -503,10 +510,17 @@ class TwitterScraper():
                 # Determine image type.
                 image_type = re.search('(format=)\w+', image_url).group(0).split('=')[1]
                 images_to_archive.append([max_size_image_url, image_type])
-            
-            datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+        
+        except NoSuchElementException as e:
+            logger.error("Error finding Tweet image in Twitter's HTML!")
+            logger.error(e)
+            # Return a failure.
+            return(False)
+        
+        datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
         
         # Try to download the post.
+        try:
             # Record the image source URLs, if given.
             if images_to_archive != None:
                 image_count = 0
@@ -547,8 +561,8 @@ class TwitterScraper():
                     with open(os.path.join(path_to_download_dir, image_filename), 'wb') as file:
                         image.save(file, image_type)
                 except Exception as e:
-                    print("  Error downloading image from Twitter!")
-                    print(e)
+                    logger.error("  Error downloading image from Twitter!")
+                    logger.error(e)
                     return(False)
                 
                 image_count += 1
@@ -557,8 +571,8 @@ class TwitterScraper():
             return(True)
         
         except NoSuchElementException as e:
-            print("  Error downloading image from Twitter!")
-            print(e)
+            logger.error("  Error downloading image from Twitter!")
+            logger.error(e)
             # Return a failure.
             return(False)
 
@@ -569,8 +583,8 @@ class TwitterScraper():
     #   String is the downloaded text, or None if download failed.
     #   JSON is the post metadata, or None if download failed.
     def downloadVideo(self, tweet, tweet_number, metadata, path_to_download_dir, SCREENSHOT):
-        try:
         # Locate the text in the Tweet.
+        try:
             textblock = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetText']")  # The dot at the start of xpath means "search the children of this element".
             textblock_children_list = textblock.find_elements(By.XPATH, "*")
         # Parse the text within the tweet.
@@ -583,11 +597,11 @@ class TwitterScraper():
                     text = text + "\n" + "\n"
         
         except NoSuchElementException as e:
-            print("  No text accompanies this video post.")
+            logger.debug("  No text accompanies this video post.")
             text = ""
         
-        try:
         # Locate the video in Twitter.
+        try:
             videoblock = tweet.find_element(By.XPATH, ".//div[@data-testid='videoPlayer']")
             video = videoblock.find_elements(By.XPATH, ".//video[@aria-label='Embedded video']")
             self.wait.until(EC.visibility_of(videoblock))
@@ -595,10 +609,17 @@ class TwitterScraper():
             # Locate the direct link to the Tweet on the page, by checking the datestamp link.
             date = tweet.find_element(By.TAG_NAME, 'time').text
             direct_tweet_link = tweet.find_element(By.XPATH, ".//a[@aria-label='" + date + "']").get_attribute("href")
+        
+        except NoSuchElementException as e:
+            logger.error("Error finding Tweet video in Twitter's HTML!")
+            logger.error(e)
+            # Return a failure.
+            return(False)
             
-            datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-            
+        datestring = metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+        
         # Try to download the post.
+        try:
             # Try to save the post's metadata.
             if self.downloadMetadata(metadata, path_to_download_dir, tweet_number) is False:
                 return(False)
@@ -624,9 +645,9 @@ class TwitterScraper():
             # Return a success.
             return(True)
         
-        except NoSuchElementException as e:
-            print("  Error downloading video from Twitter!")
-            print(e)
+        except Exception as e:
+            logger.error("Error downloading video from Twitter!")
+            logger.error(e)
             # Return a failure.
             return(False)
     
