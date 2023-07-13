@@ -26,7 +26,6 @@ class GmailAccount():
             # TODO(developer) - Handle errors from gmail API.
             print(f'An error occurred logging in to Gmail: {error}')
     
-    
     def getLabels(self):
         try:
             # Request a dict of all the labels.
@@ -42,21 +41,45 @@ class GmailAccount():
             # TODO(developer) - Handle errors from gmail API.
             print(f'An error occurred getting Gmail labels: {error}')
     
+    # Returns a list containing all unread emails with the chosen label.
     def getUnreadMessageIds(self, label):
-        # Returns a list containing all unread emails with the chosen label.
-        messages = None
-        
+        messages = []
+        # The MaxResults value is the maximum number of emails which will be retrieved.
+        # The API default value is 100.
+        max_results = 200
         try:
-            # The MaxResults value is the maximum number of emails which will be retrieved.
-            # The default value is 100.
-            max_results = 200
-            messagesResult = self.service.users().messages().list(maxResults=max_results, userId='me', q=f'in:{label} is:unread').execute()
-            messages = messagesResult.get('messages', [])
+            # Fetch the user profile, to determine the maximum number of emails to search.
+            user_profile_query = self.service.users().getProfile(userId='me').execute()
+            max_results = user_profile_query.get("messagesTotal")
         except HttpError as error:
             # TODO(developer) - Handle errors from gmail API.
-            print(f'An error occurred when getting all unread email IDs: {error}')
+            print(f'An error occurred when getting the maximum email count: {error}')
         
-        logger.debug("Gmail emails retrieved!")
+        logger.debug(f"Fetching {max_results} emails from Gmail...")
+        next_page_token = ""
+        results_count = 500
+        messagesResult = self.service.users().messages().list(  maxResults=max_results,
+                                                                userId='me',
+                                                                q=f'in:{label} is:unread'
+                                                             ).execute()
+        next_page_token = messagesResult.get('nextPageToken')
+        results_count = messagesResult.get('resultSizeEstimate')
+        messages.extend(messagesResult.get('messages', []))
+        while results_count >= 500:
+            try:
+                messagesResult = self.service.users().messages().list(  maxResults=max_results,
+                                                                        pageToken=next_page_token,
+                                                                        userId='me',
+                                                                        q=f'in:{label} is:unread'
+                                                                     ).execute()
+                next_page_token = messagesResult.get('nextPageToken')
+                results_count = messagesResult.get('resultSizeEstimate')
+                messages.extend(messagesResult.get('messages', []))
+            except HttpError as error:
+                # TODO(developer) - Handle errors from gmail API.
+                print(f'An error occurred when getting all unread email IDs: {error}')
+        
+        logger.info("Gmail emails retrieved: " + str(len(messages)))
         return messages
 
     def getEmailFromMessageId(self, message_id):
