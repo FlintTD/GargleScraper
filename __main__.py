@@ -281,7 +281,7 @@ def main(argv):
                         # Prep DeviantArt account and scraper.
                         deviantart_credentials = credentials_manager.get_deviantart_credentials()
                         d_scraper = deviantart_scraper.DeviantartScraper(
-                                            path_to_archive,
+                                            working_dir,
                                             deviantart_credentials['username'],
                                             deviantart_credentials['password']
                                             )
