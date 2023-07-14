@@ -790,6 +790,7 @@ class TwitterScraper():
                 # Attempt to download a single Tweet and its metadata.
                 if not self.downloadTweet(tweet, tweet_count, metadata, dir_path, SCREENSHOT):
                     # Delete the post's archive directory.
+                    logger.debug("Deleting the incomplete archive directory...")
                     shutil.rmtree(dir_path)
                     return False, self.posts_viewed
                 
