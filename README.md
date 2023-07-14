@@ -80,3 +80,7 @@ To invoke the Gargle Scaper, type navigate to the Gargle Scraper's directory and
 
 ### Unimplemented Commands
 **-o**, or **--overwrite**: Modifier which will cause the scaper to overwrite any posts found to be already downloaded.
+
+
+# Selected Thank-Yous
+* [This thread on GitHub](https://gist.github.com/micycle1/735006a338e4bea1a9c06377610886e7) provided valuable insight into the Wix API which backends DeviantArt.
