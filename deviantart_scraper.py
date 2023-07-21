@@ -170,7 +170,7 @@ class DeviantartScraper():
         try:
             ActionChains(self.driver).scroll_to_element(element).perform()  # focus
             location = element.location
-            logger.info("Taking screenshot of element at screen coordinates: " + str(location))
+            logger.debug("Taking screenshot of element at screen coordinates: " + str(location))
             size = element.size
             self.wait.until(EC.visibility_of(element))
             png = self.driver.get_screenshot_as_png()
@@ -350,19 +350,20 @@ class DeviantartScraper():
             logger.error(e)
             return False
         
-        try:
-            # Try to save the deviation's tags.
-            tag_list = []
-            tags = deviation_information_blocks[2].find_elements(By.TAG_NAME, 'a')
-            for tag in tags:
-                tag_list.append(tag.find_element(By.TAG_NAME, 'span').text)
-            if tag_list:
-                deviation.metadata["tags"] = tag_list
-            logger.debug("Scraped the deviation's tags.")
-        except Exception as e:
-            logger.error("Failed to read the image deviation's tags, although it appears they are present!")
-            logger.error(e)
-            return False
+        if has_tags:
+            try:
+                # Try to save the deviation's tags.
+                tag_list = []
+                tags = deviation_information_blocks[2].find_elements(By.TAG_NAME, 'a')
+                for tag in tags:
+                    tag_list.append(tag.find_element(By.TAG_NAME, 'span').text)
+                if tag_list:
+                    deviation.metadata["tags"] = tag_list
+                logger.debug("Scraped the deviation's tags.")
+            except Exception as e:
+                logger.error("Failed to read the image deviation's tags, although it appears they are present!")
+                logger.error(e)
+                return False
         
         try:
         # Try to locate and download the Deviation.
@@ -391,7 +392,6 @@ class DeviantartScraper():
                         while download_incomplete:
                             images = os.listdir(self.download_dir)
                             if not images == []:
-                                print(images)
                                 for file in images:
                                     if file.endswith('.crdownload'):
                                         time.sleep(1)
