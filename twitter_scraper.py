@@ -125,8 +125,8 @@ class TwitterScraper():
             right = left + size['width']
             bottom = top + size['height']
             im = im.crop((left, top, right, bottom))
-            with open(os.path.join(dir_path, screenshot_name + ".png"), 'wb') as file:
-                im.save(file, "png")
+            rgb_im = im.convert('RGB')
+            rgb_im.save(os.path.join(dir_path, screenshot_name + ".jpg"))
         except Exception as e:
             logger.error("Error taking screenshot of web element!")
             logger.error(e)
