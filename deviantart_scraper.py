@@ -323,10 +323,18 @@ class DeviantartScraper():
     # Downloads a Deviation containing an image.
     # Returns a Boolean indicating success or failure.
     def downloadImage(self, deviation, archive_path, SCREENSHOT):
+        has_tags = False
         try:
             # Try to locate the deviation's size text.
+            # The number of divs in the deviation's information block can change by one, depending on if tags are used or not.
             deviation_author_block = deviation.main.find_element(By.XPATH, ".//div[@data-hook='deviation_meta']")
-            deviation_size_data_string = deviation_author_block.find_element(By.XPATH, "../div[5]/div/div/div/div/div[2]/div[2]").text
+            deviation_information_blocks = deviation_author_block.find_elements(By.XPATH, "../div")
+            # Be careful here, python lists are zero-indexed, but XPATH is one-indexed...
+            if "description" in str(deviation_information_blocks[3].get_attribute("id")):
+                deviation_size_data_string = deviation_author_block.find_element(By.XPATH, "../div[5]/div/div/div/div/div[2]/div[2]").text
+                has_tags = True
+            else:
+                deviation_size_data_string = deviation_author_block.find_element(By.XPATH, "../div[4]/div/div/div/div/div[2]/div[2]").text
         except Exception as e:
             logger.error("Failed to find the HTML location of the deviation's size text!")
             logger.error(e)
@@ -339,6 +347,20 @@ class DeviantartScraper():
             deviation.metadata["original height"] = sanitized_size_data_string.split("x")[1] + "px"
         except Exception as e:
             logger.error("Failed to read the image deviation's original size!")
+            logger.error(e)
+            return False
+        
+        try:
+            # Try to save the deviation's tags.
+            tag_list = []
+            tags = deviation_information_blocks[2].find_elements(By.TAG_NAME, 'a')
+            for tag in tags:
+                tag_list.append(tag.find_element(By.TAG_NAME, 'span').text)
+            if tag_list:
+                deviation.metadata["tags"] = tag_list
+            logger.debug("Scraped the deviation's tags.")
+        except Exception as e:
+            logger.error("Failed to read the image deviation's tags, although it appears they are present!")
             logger.error(e)
             return False
         
@@ -424,7 +446,8 @@ class DeviantartScraper():
                     logger.debug("Sneakily downloading the full-rez (jpg only 😢) image version...")
                     try:
                         image_source_url = deviation_image.get_attribute("src")
-                        # Parse image URL.
+                        # Check the image URL to see if it is a machine-code alphanumeric ("obfuscated') filename, or a sanitized version of the original title.
+                        # These obfuscated filenames need to be handled differently than the more standard sanitized title URLs.
                         detokenized_image_url = image_source_url.split('?')[0]
                         obfuscation_pattern = "\w{8}-\w{4}-\w{4}-\w{4}-\w{12}.jpg"
                         obfuscated_image_match = re.search(obfuscation_pattern, detokenized_image_url)
