@@ -315,6 +315,8 @@ def main(argv):
     print("  " + posts_total_message)
     if ACTIVE_PLATFORMS["twitter"] is True:
         t_scraper.teardown()
+    if ACTIVE_PLATFORMS["deviantart"] is True:
+        d_scraper.teardown()
     
     # Exit the Gargle Scraper once the main function is complete, even if no other exit conditions are met.
     logger.info("Gargle Scraper is now closing...")
