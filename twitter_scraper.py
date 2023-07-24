@@ -234,7 +234,7 @@ class TwitterScraper():
         
         # Try to find an image in the tweet second.
         try:
-            image = tweet.find_element(By.XPATH, ".//div[@aria-label='Image']")
+            image = tweet.find_element(By.XPATH, ".//div[@data-testid='tweetPhoto']")
             if is_quoting and (quote_url != 'DELETED'):
                 if self.isElementInQuotedTweet(image):
                     #print("  Not an image post, image found inside quoted tweet!")
@@ -505,6 +505,10 @@ class TwitterScraper():
             self.wait.until(EC.visibility_of_element_located((By.XPATH, ".//div[@data-testid='tweetPhoto']")))
             imageblock = tweet.find_elements(By.XPATH, ".//div[@data-testid='tweetPhoto']")
             for images in imageblock:
+                # TODO: Save the alt text.
+                #metadata["alt_text"] = str(imageblock.get_attribute("aria-label"))
+                # Cannot save alt text given the current architecture.
+                # Switch to an object-oriented design with a Tweet object!
                 image_url = images.find_element(By.TAG_NAME, 'img').get_attribute("src")
                 max_size_image_url = re.sub('(name=)\w+', "name=orig", image_url, 1)
                 # Determine image type.
