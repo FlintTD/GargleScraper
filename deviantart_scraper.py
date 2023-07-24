@@ -144,7 +144,7 @@ class DeviantartScraper():
     
     def goToPage(self, url):
         logger.debug("Navigating to web page at: " + str(url))
-        time.sleep(4 + 2.5 * random.random())
+        time.sleep(3 + 2.5 * random.random())
         self.driver.get(str(url))
         self.wait.until(EC.visibility_of_element_located((By.XPATH, "//a[@aria-label='DeviantArt - Home']")))
         time.sleep(0.5 + 1.5 * random.random())
@@ -152,7 +152,7 @@ class DeviantartScraper():
     
     def goToImagePage(self, url):
         logger.debug("Navigating to web page at: " + str(url))
-        time.sleep(4 + 2.5 * random.random())
+        time.sleep(3 + 2.5 * random.random())
         self.driver.get(str(url))
         self.wait.until(EC.visibility_of_element_located((By.XPATH, ".//img")))
         time.sleep(0.5 + 1.5 * random.random())
@@ -331,20 +331,29 @@ class DeviantartScraper():
             deviation_information_blocks = deviation_author_block.find_elements(By.XPATH, "../div")
             # Be careful here, python lists are zero-indexed, but XPATH is one-indexed...
             if "description" in str(deviation_information_blocks[3].get_attribute("id")):
-                deviation_size_data_string = deviation_author_block.find_element(By.XPATH, "../div[5]/div/div/div/div/div[2]/div[2]").text
+                deviation_size_data_block = deviation_author_block.find_element(By.XPATH, "../div[5]")
                 has_tags = True
             else:
-                deviation_size_data_string = deviation_author_block.find_element(By.XPATH, "../div[4]/div/div/div/div/div[2]/div[2]").text
+                deviation_size_data_block = deviation_author_block.find_element(By.XPATH, "../div[4]")
+            
+            try:
+                deviation_size_data_string = deviation_size_data_block.find_element(By.XPATH, "./div/div/div/div/div/div[2]").text
+            except Exception as e:
+                logger.error("Failed to find the HTML location of the deviation's size data text within the size-data block!")
+                logger.error("DeviantArt probably shuffled their divs around again!")
+                logger.error(e)
+                return False
+            
         except Exception as e:
-            logger.error("Failed to find the HTML location of the deviation's size text!")
+            logger.error("Failed to find the deviation's size-data block!")
             logger.error(e)
             return False
         
         try:
             # Try to parse the deviation's original size from the size text.
             sanitized_size_data_string = deviation_size_data_string.split(" ")[0].split("p")[0]
-            deviation.metadata["original width"] = sanitized_size_data_string.split("x")[0] + "px"
-            deviation.metadata["original height"] = sanitized_size_data_string.split("x")[1] + "px"
+            deviation.metadata["original_width"] = sanitized_size_data_string.split("x")[0] + "px"
+            deviation.metadata["original_height"] = sanitized_size_data_string.split("x")[1] + "px"
         except Exception as e:
             logger.error("Failed to read the image deviation's original size!")
             logger.error(e)
@@ -407,7 +416,7 @@ class DeviantartScraper():
                         # Move the image from Tempdownloads to the archive directory.
                         for image_name in images:
                             shutil.move(os.path.join(self.download_dir, image_name), os.path.join(archive_path, image_name))
-                            deviation.metadata['full resolution'] = True
+                            deviation.metadata["full_resolution"] = True
                     except Exception as e:
                         logger.error("Deviation could not be moved from Tempdownloads folder!")
                         logger.error(e)
@@ -455,8 +464,8 @@ class DeviantartScraper():
                             logger.debug("Identified this deviation's source URL as obfuscated! Undoing...")
                             # Modify the image URL.
                             modified_image_url = detokenized_image_url.replace("/f/", "/intermediary/f/")
-                            width = deviation.metadata['original width'][:-2]
-                            height = deviation.metadata['original height'][:-2]
+                            width = deviation.metadata["original_width"][:-2]
+                            height = deviation.metadata["original_height"][:-2]
                             html_dimensions_string = f"/v1/fill/w_{width},h_{height},q_100/"
                             url_ized_name = re.sub("\W", "_", deviation.metadata["title"].lower())
                             guessed_original_name = url_ized_name + "_by_" + deviation.metadata["author"].lower()
@@ -468,8 +477,8 @@ class DeviantartScraper():
                             logger.debug("This deviation's source URL appears to be unobfuscated.")
                             # Modify the image URL.
                             modified_image_url = image_source_url.split("?token=")[0].replace("/f/", "/intermediary/f/")
-                            width = deviation.metadata['original width'][:-2]
-                            height = deviation.metadata['original height'][:-2]
+                            width = deviation.metadata["original_width"][:-2]
+                            height = deviation.metadata["original_height"][:-2]
                             html_dimensions_string = f"/v1/fill/w_{width},h_{height},q_100/"
                             highrez_image_url = re.sub("/v1/fill/.+/", html_dimensions_string, modified_image_url)
                             logger.debug("High resolution image URL: " + highrez_image_url)
@@ -533,13 +542,13 @@ class DeviantartScraper():
     
     def downloadDeviation(self, deviation, dir_path, SCREENSHOT):
         downloaded = False
-        if deviation.metadata["post type"] == "text":
+        if deviation.metadata["post_type"] == "text":
             logger.info("  Text Deviation.")
             downloaded = self.downloadText(deviation, dir_path, SCREENSHOT)
-        elif deviation.metadata["post type"] == "image":
+        elif deviation.metadata["post_type"] == "image":
             logger.info("  Image Deviation.")
             downloaded = self.downloadImage(deviation, dir_path, SCREENSHOT)
-        elif deviation.metadata["post type"] == "video":
+        elif deviation.metadata["post_type"] == "video":
             logger.info("  Video Deviation.")
             downloaded = self.downloadVideo(deviation, dir_path, SCREENSHOT)
         else:
@@ -585,7 +594,7 @@ class DeviantartScraper():
         if media_type == False:
             return False
         else:
-            deviation.metadata["post type"] = media_type
+            deviation.metadata["post_type"] = media_type
         if not self.downloadDeviation(deviation, dir_path, SCREENSHOT):
             # Delete the post's archive directory.
             logger.debug("Deleting the incomplete archive directory...")
@@ -625,7 +634,7 @@ class Deviation():
                 datetime_obj = datetime.fromisoformat(timestring)
                 self.metadata["date"] = datetime_obj
                 # Record the time the Deviation was scraped.
-                self.metadata["time of scrape"] = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+                self.metadata["time_of_scrape"] = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
                 logger.debug("...fetching complete!")
                 return True
             except Exception as e:
@@ -636,9 +645,9 @@ class Deviation():
             try:
                 title_info_bar = self.main.find_element(By.XPATH, ".//div[@data-hook='deviation_meta']")
                 # Record the Deviation's title.
-                self.metadata['title'] = title_info_bar.find_element(By.XPATH, ".//h1[@data-hook='deviation_title']").text
+                self.metadata["title"] = title_info_bar.find_element(By.XPATH, ".//h1[@data-hook='deviation_title']").text
                 # Record the author's handle.
-                self.metadata['author'] = title_info_bar.find_element(By.XPATH, ".//a[@data-hook='user_link']").get_attribute("data-username")
+                self.metadata["author"] = title_info_bar.find_element(By.XPATH, ".//a[@data-hook='user_link']").get_attribute("data-username")
                 # Record the time the Deviation was posted.
                 timestring = title_info_bar.find_element(By.TAG_NAME, "time").get_attribute("datetime")
                 datetime_obj = datetime.fromisoformat(timestring)
