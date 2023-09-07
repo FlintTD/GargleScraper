@@ -81,14 +81,37 @@ def isThisPostArchived(url):
         return False
     return False 
 
-   
-#def scrapeFromDeviantart: 
-    # Use the DeviantArt Scraper.
+
+# Sets an arbitrary option to an arbitrary value inside the JSON options  file.
+# Will create an options file if none exists.
+def setOption(option, value):
+    with open('options.json', 'w+', encoding='utf8') as options_file:
+        if options_file.read(1):
+            options = json.loads(options_file.read())
+        else:
+            options = {}
+        options[option] = value
+        json.dump(options, options_file)
+
+
+# Deletes an arbitrary option-value inside the JSON options file.
+def forgetOption(option):
+    # Check if opened file exists.
+    if os.path.isfile('options.json'):
+        # Check if opened file is empty.
+        if os.path.getsize('options.json') > 0:
+            options = {}
+            with open('options.json', 'r', encoding='utf8') as options_file:
+                options = json.loads(options_file.read())
+            del options[option]
+            with open('options.json', 'w', encoding='utf8') as options_file:
+                json.dump(options, options_file)
 
 
 def main(argv):
-    opts, args = getopt.getopt(argv,"hu:f:gp:v:s",["help","url=","file=","gmail","postlimit=","verbosity=","screenshot"])
+    opts, args = getopt.getopt(argv,"hu:f:gp:v:s",["help","url=","file=","gmail","postlimit=","verbosity=","screenshot","setopt=","forgetopt="])
     urls = []
+    GMAIL_LABEL = ""
     USE_URL = False
     USE_GMAIL = False
     USE_CSV = False
@@ -98,6 +121,18 @@ def main(argv):
     VERBOSE = False
     SCREENSHOT = False
     post_limit_reached = False
+    
+    # Read in the options file.
+    # Check if opened file exists.
+    if os.path.isfile('options.json'):
+        # Check if opened file is empty.
+        if os.path.getsize('options.json') > 0:
+            options = {}
+            with open('options.json', 'r', encoding='utf8') as options_file:
+                options = json.loads(options_file.read())
+            if options is True:
+                if "label" in options:
+                    GMAIL_LABEL = options["label"]
     
     for opt, arg in opts:
         if opt in ('-h', '--help'):
@@ -144,6 +179,24 @@ def main(argv):
         
         elif opt in ('-s', '--screenshot'):
             SCREENSHOT = True
+            
+        elif opt in ('--setopt'):
+            if "," in arg:
+                options = arg.split(",")
+                option = options[0].lower()
+                value = options[1]
+                if option.isalnum() or value.isalnum():
+                    setOption(option, value)
+                    print(f"  The option '{option}' was set to: {value}.")
+                else:
+                    print("  The options and values must be an alphanumeric string!")
+            sys.exit()
+        
+        elif opt in ('--forgetopt'):
+            option = arg.lower()
+            forgetOption(option)
+            print(f"  The option was forgotten.")
+            sys.exit()
     
     # Configure logging.
     # Create logger.
@@ -202,7 +255,7 @@ def main(argv):
             sys.exit()
 
         # Get the IDs of all unread emails with the label: The Gargle.
-        unread_message_ids = gmail_account.getUnreadMessageIds("The Gargle")
+        unread_message_ids = gmail_account.getUnreadMessageIds(GMAIL_LABEL)
 
         #print(unread_message_ids[0])
         

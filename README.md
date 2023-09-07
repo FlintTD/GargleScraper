@@ -68,18 +68,27 @@ To invoke the Gargle Scaper, type navigate to the Gargle Scraper's directory and
 
 **-u**, or **--url**: Scrapes a single post from a single URL.
 
-**-g**, or **--gmail**: Scrapes ALL posts contained in emails with a specific Label in your Gmail server.
+**-g**, or **--gmail**: Scrapes ALL URLs contained in emails with a specific Label in your Gmail server.
 
 **-f**, or **--file**: Scrapes all URLs contained within a provided file. Currently only supports CSV files.
 
 **-p**, or **--postlimit**: Sets a limit on how many posts the scraper can view before deactivating. This is *not* how many posts the scraper will download. For example, a Twitter thread requires navigating to multiple individual posts to scrape an single thread.
 
-**-v**, or **--verbosity**: Tells the scraper to be more or less detailed in its logging. Log file is GargleScraper.log.
+**-v**, or **--verbosity**: Tells the scraper to be more or less detailed in its logging. The log file is named GargleScraper.log.
 
 **-s**, or **--screenshot**: Tells the scraper to take a screenshot of every Tweet it scrapes. Screenshots are saved in the post's archive directory as a PNG image file.
 
+**--setopt**: Sets an option in the scraper's persistent option file to a given value. The command's arguement should be formatted as: "\[option\]","\[value\]". The option file is named options.json.
+
+**--forgetopt**: Removes an option from the scraper's persistent option file.
+
 ### Unimplemented Commands
 **-o**, or **--overwrite**: Modifier which will cause the scaper to overwrite any posts found to be already downloaded.
+
+### Options
+Setting options permits users of the Gargle Scraper to persistently set certain conditions for all future operations, without the use of command-line arguements. Below is the exhaustive list of all valid options which can be set for the scraper:
+
+- **label**: This is the plaintext name of Gmail label which the scraper will pull emails from, when told to scrape URLs from a Gmail server.
 
 
 # Selected Thank-Yous
