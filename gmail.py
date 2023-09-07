@@ -42,9 +42,9 @@ class GmailAccount():
             print(f'An error occurred getting Gmail labels: {error}')
     
     # Returns a list containing all unread emails with the chosen label.
-    def getUnreadMessageIds(self, label):
+    def getUnreadMessageIds(self, label, limit):
         messages = []
-        # The MaxResults value is the maximum number of emails which will be retrieved.
+        # The max_results value is the maximum number of emails which will be retrieved.
         # The API default value is 100.
         max_results = 200
         try:
@@ -54,6 +54,10 @@ class GmailAccount():
         except HttpError as error:
             # TODO(developer) - Handle errors from gmail API.
             print(f'An error occurred when getting the maximum email count: {error}')
+        
+        # Limit the number of emails to search to the maximum provided scraping limit.
+        if limit != -1:
+            max_results = limit
         
         logger.debug(f"Fetching {max_results} emails from Gmail...")
         next_page_token = ""

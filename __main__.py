@@ -130,7 +130,8 @@ def main(argv):
             options = {}
             with open('options.json', 'r', encoding='utf8') as options_file:
                 options = json.loads(options_file.read())
-            if options is True:
+            # If the options dictionary is populated.
+            if bool(options):
                 if "label" in options:
                     GMAIL_LABEL = options["label"]
     
@@ -144,6 +145,8 @@ def main(argv):
             print('  __main__.py -p <Post limit>')
             print('  __main__.py -v      (sets the verbosity of the logs printed to console)')
             print('  __main__.py -s      (collects screenshots of posts)')
+            print('  __main__.py --setopt "<option>","<value>"')
+            print('  __main__.py --forgetopt "<option>"')
             # Exit the Gargle Scraper.
             sys.exit()
         
@@ -255,7 +258,7 @@ def main(argv):
             sys.exit()
 
         # Get the IDs of all unread emails with the label: The Gargle.
-        unread_message_ids = gmail_account.getUnreadMessageIds(GMAIL_LABEL)
+        unread_message_ids = gmail_account.getUnreadMessageIds(GMAIL_LABEL, POST_LIMIT)
 
         #print(unread_message_ids[0])
         
