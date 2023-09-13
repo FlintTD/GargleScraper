@@ -90,6 +90,10 @@ Setting options permits users of the Gargle Scraper to persistently set certain 
 
 - **label**: This is the plaintext name of Gmail label which the scraper will pull emails from, when told to scrape URLs from a Gmail server.
 
+- **twitter limit**: This is the integer number of Twitter posts that can be accessed by the scraper during operations.
+
+- **deviantart limit**: This is the integer number of DeviantArt posts that can be accessed by the scraper during operations.
+
 
 # Selected Thank-Yous
 * [This thread on GitHub](https://gist.github.com/micycle1/735006a338e4bea1a9c06377610886e7) provided valuable insight into the Wix API which backends DeviantArt.
