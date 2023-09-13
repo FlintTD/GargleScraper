@@ -118,6 +118,10 @@ def main(argv):
     FILEPATH = ""
     POST_LIMIT = -1
     POSTS_VIEWED = 0
+    TWITTER_LIMIT = -1
+    TWEETS_VIEWED = 0
+    DEVIANTART_LIMIT = -1
+    DEVIATIONS_VIEWED = 0
     VERBOSE = False
     SCREENSHOT = False
     post_limit_reached = False
@@ -134,6 +138,10 @@ def main(argv):
             if bool(options):
                 if "label" in options:
                     GMAIL_LABEL = options["label"]
+                if "twitter limit" in options:
+                    TWITTER_LIMIT = options["twitter limit"]
+                if "deviantart limit" in options:
+                    DEVIANTART_LIMIT = options["deviantart limit"]
     
     for opt, arg in opts:
         if opt in ('-h', '--help'):
@@ -279,10 +287,11 @@ def main(argv):
                     email_urls_list = sanitizeEmailBody(emailBody)
                     for url_string in email_urls_list:
                         urls.append(url_string)
-                
     
     post_count = 0
     total_posts = len(urls)
+    failed_scrapes = 0
+    unscrapable_posts = 0
     if POST_LIMIT == -1:
         logger.error("Warning! Scraping without a post limit risks exceeding your daily post cap!")
     
@@ -293,75 +302,79 @@ def main(argv):
             logger.info("Scraping: " + url + " ...")
             # Determine which platform the link is for.
             platform = whichPlatformIsUrl(url)
+            
             # -------- Twitter --------
             if platform == "twitter":
-                if not isThisPostArchived(url):
-                    if ACTIVE_PLATFORMS[platform] is True:
+                if (TWITTER_LIMIT == -1) or (TWEETS_VIEWED < TWITTER_LIMIT):
+                    if not isThisPostArchived(url):
+                        if ACTIVE_PLATFORMS[platform] is False:
+                            # Prep Twitter account and scraper.
+                            ACTIVE_PLATFORMS[platform] = True
+                            twitter_credentials = credentials_manager.get_twitter_credentials()
+                            t_scraper = twitter_scraper.TwitterScraper(
+                                                path_to_archive,
+                                                twitter_credentials['email'],
+                                                twitter_credentials['username'],
+                                                twitter_credentials['password']
+                                                )
+                            # Open the Twitter home page.
+                            t_scraper.load()
+                            t_scraper.login()
+                            
                         # Scrape the Twitter post.
                         success, additional_posts_viewed = t_scraper.scrapeFromTwitter(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
+                        TWEETS_VIEWED += additional_posts_viewed
                         if success:
                             logger.info("Twitter scraper has archived the post!")
                             post_count += 1
                         else:
                             logger.error("Twitter scraper failed to archive the post!")
+                            failed_scrapes += 1
                     else:
-                        ACTIVE_PLATFORMS[platform] = True
-                        # Prep Twitter account and scraper.
-                        twitter_credentials = credentials_manager.get_twitter_credentials()
-                        t_scraper = twitter_scraper.TwitterScraper(
-                                            path_to_archive,
-                                            twitter_credentials['email'],
-                                            twitter_credentials['username'],
-                                            twitter_credentials['password']
-                                            )
-                        # Open the Twitter home page.
-                        t_scraper.load()
-                        t_scraper.login()
-                        # Scrape the Twitter post.
-                        success, additional_posts_viewed = t_scraper.scrapeFromTwitter(url, SCREENSHOT)
-                        POSTS_VIEWED += additional_posts_viewed
-                        if success:
-                            logger.info("Twitter scraper has archived the post!")
-                            post_count += 1
-                        else:
-                            logger.error("Twitter scraper has failed to archive the post!")
-                else:
-                    logger.info("This Tweet has already been scraped and archived!")
-                    post_count += 1
+                        logger.info("This Tweet has already been scraped and archived!")
+                        post_count += 1
+            
             # -------- DeviantArt --------
             elif platform == "deviantart":
-                if not isThisPostArchived(url):
-                    if ACTIVE_PLATFORMS[platform] is False:
-                        ACTIVE_PLATFORMS[platform] = True
-                        # Prep DeviantArt account and scraper.
-                        deviantart_credentials = credentials_manager.get_deviantart_credentials()
-                        d_scraper = deviantart_scraper.DeviantartScraper(
-                                            working_dir,
-                                            deviantart_credentials['username'],
-                                            deviantart_credentials['password']
-                                            )
-                        # Open the DeviantArt home page.
-                        d_scraper.load()
-                        d_scraper.login()
-                        
-                    # Scrape the DeviantArt post.
-                    success = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
-                    if success:
-                        logger.info("DeviantArt scraper has archived the post!")
-                        post_count += 1
+                if (DEVIANTART_LIMIT == -1) or (DEVIATIONS_VIEWED < DEVIANTART_LIMIT):
+                    if not isThisPostArchived(url):
+                        if ACTIVE_PLATFORMS[platform] is False:
+                            # Prep DeviantArt account and scraper.
+                            ACTIVE_PLATFORMS[platform] = True
+                            deviantart_credentials = credentials_manager.get_deviantart_credentials()
+                            d_scraper = deviantart_scraper.DeviantartScraper(
+                                                working_dir,
+                                                deviantart_credentials['username'],
+                                                deviantart_credentials['password']
+                                                )
+                            # Open the DeviantArt home page.
+                            d_scraper.load()
+                            d_scraper.login()
+                            
+                        # Scrape the DeviantArt post.
+                        success = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
+                        POSTS_VIEWED += additional_posts_viewed
+                        DEVIATIONS_VIEWED += additional_posts_viewed
+                        if success:
+                            logger.info("DeviantArt scraper has archived the post!")
+                            post_count += 1
+                        else:
+                            logger.error("DeviantArt scraper failed to archive the post!")
+                            failed_scrapes += 1
                     else:
-                        logger.error("DeviantArt scraper failed to archive the post!")
-                else:
-                    logger.info("This Deviation has already been scraped and archived!")
-                    post_count += 1
+                        logger.info("This Deviation has already been scraped and archived!")
+                        post_count += 1
+            
+            # -------- Anything Else --------
             else:
                 logger.error("This website has no associated scraper!")
+                unscrapable_posts += 1
         else:
             post_limit_reached = True
             pass
     
-    # Cleanup
+    # Cleanup and review.
     if post_limit_reached:
         logger.warning("Post limit reached! Some posts remain unscraped!")
     else:
@@ -369,6 +382,15 @@ def main(argv):
     posts_total_message = f"Completion Rate: {post_count}/{total_posts} given posts have been archived!"
     logger.info(posts_total_message)
     print("  " + posts_total_message)
+    if failed_scrapes > 0:
+        failed_scrapes_message = f"There were {failed_scrapes} posts which scraping failed on."
+        logger.info(failed_scrapes_message)
+        print("  " + failed_scrapes_message)
+    if unscrapable_posts > 0:
+        unscrapable_posts_message = f"There were {unscrapable_posts} posts with no associated scraper module."
+        logger.info(unscrapable_posts_message)
+        print("  " + unscrapable_posts_message)
+    
     if ACTIVE_PLATFORMS["twitter"] is True:
         t_scraper.teardown()
     if ACTIVE_PLATFORMS["deviantart"] is True:
