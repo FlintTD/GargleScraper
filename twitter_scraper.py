@@ -39,7 +39,7 @@ class TwitterScraper():
         chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
         self.driver = webdriver.Chrome(
-            service = Service(executable_path = os.path.join(os.getcwd(), 'chromedriver')),
+            #service = Service(executable_path = os.path.join(os.getcwd(), 'chromedriver')),
             options = chrome_options
         )
         self.wait = WebDriverWait(self.driver, 10, poll_frequency=1, ignored_exceptions=[ElementNotVisibleException, ElementNotSelectableException])
@@ -50,7 +50,7 @@ class TwitterScraper():
         # Load www.twitter.com in a web browser.
         self.driver.get("http://www.twitter.com")
         # Wait until the title of the page includes the word "Twitter".
-        dummy = self.wait.until(EC.title_contains("Twitter"))
+        dummy = self.wait.until(EC.title_contains("Home / X"))
 
     
     def login(self):
@@ -268,6 +268,7 @@ class TwitterScraper():
         self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Home timeline']")))
         
         # Find the full "conversation" thread (e.g. tweet + comments + previous tweets).
+        self.wait.until(EC.visibility_of_element_located((By.XPATH, "//div[@aria-label='Timeline: Conversation']")))
         conversation = self.driver.find_element(By.XPATH, "//div[@aria-label='Timeline: Conversation']")
         # Create a list of all present tweets in the conversation (original + previous + comments).
         present_tweets = conversation.find_elements(By.XPATH, ".//article[@data-testid='tweet'][@role='article']")
@@ -707,7 +708,7 @@ class TwitterScraper():
     # Download the full data and metadata of a Tweet or Thread (whichever is found).
     # Returns two values:
     #     True or False boolean, indicating a successful scrape or not.
-    #     Integer quantity of posts navigated to; counting for checking the Twitter post limiter.
+    #     Integer quantity of posts navigated to; counting because of the Twitter post limiter.
     def scrapeFromTwitter(self, url, SCREENSHOT):
     # Reset the local count of posts viewed.
         self.posts_viewed = 0
