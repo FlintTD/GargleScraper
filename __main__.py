@@ -85,20 +85,29 @@ def isThisPostArchived(url):
 # Sets an arbitrary option to an arbitrary value inside the JSON options  file.
 # Will create an options file if none exists.
 def setOption(option, value):
-    with open('options.json', 'w+', encoding='utf8') as options_file:
-        if options_file.read(1):
-            options = json.loads(options_file.read())
+    # Check if options file exists.
+    if os.path.isfile('options.json'):
+        # Check if options file is empty.
+        if os.path.getsize('options.json') > 0:
+            with open('options.json', encoding='utf8') as options_file:
+                raw_options = options_file.read()
+                options = json.loads(raw_options)
+                options[option] = value
+            with open ('options.json', 'w', encoding='utf8') as options_file:
+                json.dump(options, options_file)
         else:
-            options = {}
-        options[option] = value
-        json.dump(options, options_file)
+            with open('options.json', 'w+', encoding='utf8') as options_file:
+                options = {}
+                options[option] = value
+                json.dump(options, options_file)
+                    
 
 
 # Deletes an arbitrary option-value inside the JSON options file.
 def forgetOption(option):
-    # Check if opened file exists.
+    # Check if options file exists.
     if os.path.isfile('options.json'):
-        # Check if opened file is empty.
+        # Check if options file is empty.
         if os.path.getsize('options.json') > 0:
             options = {}
             with open('options.json', 'r', encoding='utf8') as options_file:
