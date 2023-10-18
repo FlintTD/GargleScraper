@@ -339,6 +339,7 @@ def main(argv):
                             post_count += 1
                         else:
                             logger.error("Twitter scraper failed to archive the post!")
+                            logger.error("Post at: " + url)
                             failed_scrapes += 1
                     else:
                         logger.info("This Tweet has already been scraped and archived!")
@@ -362,7 +363,7 @@ def main(argv):
                             d_scraper.login()
                             
                         # Scrape the DeviantArt post.
-                        success = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
+                        success, additional_posts_viewed = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         DEVIATIONS_VIEWED += additional_posts_viewed
                         if success:
@@ -370,6 +371,7 @@ def main(argv):
                             post_count += 1
                         else:
                             logger.error("DeviantArt scraper failed to archive the post!")
+                            logger.error("Post at: " + url)
                             failed_scrapes += 1
                     else:
                         logger.info("This Deviation has already been scraped and archived!")
