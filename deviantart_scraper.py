@@ -46,8 +46,8 @@ class DeviantartScraper():
         #chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
             # Create an user_data_dir and add its path to the options
         #user_data_dir = os.path.normpath(tempfile.mkdtemp())
-        user_data_dir = os.path.join(self.working_dir, '/CustomChromeProfile')
-        chrome_options.add_argument(f"user-data-dir={user_data_dir}") 
+        user_data_dir = os.path.join(self.working_dir, 'CustomChromeProfile')
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
             
         self.driver = secretdriver.Chrome(
             executable_path = os.path.join(os.getcwd(), 'chromedriver'),
@@ -221,6 +221,7 @@ class DeviantartScraper():
             # Is it a video?
             try:
                 art_stage.find_element(By.XPATH, ".//section[@data-hook='react_playable']")
+                logger.error("Video deviations are not yet suported for archival from DeviantArt!")
             except:
                 pass
             # Is it an image?
@@ -325,32 +326,64 @@ class DeviantartScraper():
     def downloadImage(self, deviation, archive_path, SCREENSHOT):
         has_tags = False
         try:
-            # Try to locate the deviation's size text.
-            # The number of divs in the deviation's information block can change by one, depending on if tags are used or not.
+        # Try to locate the deviation's size text.
+        # The number of divs in the deviation's information block can change by one, depending on if tags are used or not.
             deviation_author_block = deviation.main.find_element(By.XPATH, ".//div[@data-hook='deviation_meta']")
             deviation_information_blocks = deviation_author_block.find_elements(By.XPATH, "../div")
-            # Be careful here, python lists are zero-indexed, but XPATH is one-indexed...
-            if "description" in str(deviation_information_blocks[3].get_attribute("id")):
-                deviation_size_data_block = deviation_author_block.find_element(By.XPATH, "../div[5]")
-                has_tags = True
-            else:
-                deviation_size_data_block = deviation_author_block.find_element(By.XPATH, "../div[4]")
+        except Exception as e:
+            logger.error("Failed to find the deviation's matadata information blocks!")
+            logger.error(e)
+            return False
+        
+        # Be careful here, python lists are zero-indexed, but XPATH is one-indexed...
+        try:
+            author_comments = None
+            deviation_size_data_string = None
+            tags_list = []
+            additional_details = {}
             
-            try:
-                deviation_size_data_string = deviation_size_data_block.find_element(By.XPATH, "./div/div/div/div/div/div[2]").text
-            except Exception as e:
+        # Hunt down author comments, deviation size data, tags, and other information by iterating through all of the information blocks.
+            for info_block in deviation_information_blocks:
+            # This finds the description block!
+                if "description" in str(info_block.get_attribute("id")):
+                    # Save the description/author comments for later.
+                    author_comments = info_block
+            # This finds the tags block.
+                try:
+                    tags_maybe = info_block.find_elements(By.XPATH, "./div/a")
+                    for tag in tags_maybe:
+                        raw_tag_url = tag.get_attribute('href')
+                        if "/tag/" in raw_tag_url:
+                            split_tag_url = raw_tag_url.split("/")
+                            tags_list.append(split_tag_url[-1])
+                except Exception as e:
+                    print(e)
+            # This finds additional metadata detail blocks, which may exist to identify depicted characters.
+            # TODO: This feature is not edge-tested!
+                try:
+                    detail_title = info_block.find_element(By.XPATH, "./span/span").text
+                    detail_description = info_block.find_element(By.XPATH, "./span/a").text
+                    additional_details[detail_title] = detail_description
+                except:
+                    pass
+            # This finds the deviation's size data string.
+                try:
+                    deviation_size_data_string = info_block.find_element(By.XPATH, "./div/div/div/div/div/div[2]").text
+                except:
+                    pass
+            
+            if deviation_size_data_string is None:
                 logger.error("Failed to find the HTML location of the deviation's size data text within the size-data block!")
                 logger.error("DeviantArt probably shuffled their divs around again!")
-                logger.error(e)
-                return False
+                raise Exception("Deviation size data string was not found in web page!")
             
         except Exception as e:
             logger.error("Failed to find the deviation's size-data block!")
             logger.error(e)
             return False
         
+        # Try to parse the deviation's original size from the size text.
         try:
-            # Try to parse the deviation's original size from the size text.
             sanitized_size_data_string = deviation_size_data_string.split(" ")[0].split("p")[0]
             deviation.metadata["original_width"] = sanitized_size_data_string.split("x")[0] + "px"
             deviation.metadata["original_height"] = sanitized_size_data_string.split("x")[1] + "px"
@@ -359,20 +392,16 @@ class DeviantartScraper():
             logger.error(e)
             return False
         
-        if has_tags:
-            try:
-                # Try to save the deviation's tags.
-                tag_list = []
-                tags = deviation_information_blocks[2].find_elements(By.TAG_NAME, 'a')
-                for tag in tags:
-                    tag_list.append(tag.find_element(By.TAG_NAME, 'span').text)
-                if tag_list:
-                    deviation.metadata["tags"] = tag_list
-                logger.debug("Scraped the deviation's tags.")
-            except Exception as e:
-                logger.error("Failed to read the image deviation's tags, although it appears they are present!")
-                logger.error(e)
-                return False
+        # Save the deviation's tags to metadata.
+        if tags_list:
+            deviation.metadata["tags"] = tags_list
+            logger.debug("Scraped the deviation's tags.")
+        else:
+            logger.debug("No tags were found for this deviation.")
+        
+        # Save the deviation's additional details as additional metadata.
+        if additional_details:
+            deviation.metadata["additional_details"] = additional_details
         
         try:
         # Try to locate and download the Deviation.
@@ -506,8 +535,7 @@ class DeviantartScraper():
         
         # Scrape the author's comments.
             # There are actually two near-identical "legacy-journal" elements, one for the text body and one for the author comments.
-            author_comments = deviation.main.find_element(By.ID, "description")
-            
+            #author_comments = deviation.main.find_element(By.ID, "description")
             comments_list = []
             comments_list.append(author_comments.text)
             html_comment = author_comments.get_attribute('innerHTML')
@@ -566,7 +594,7 @@ class DeviantartScraper():
         # Check to see if the Deviation has been deleted.
         if self.isDeviationDeleted():
             logger.warning("  This Deviation from DeviantArt has been deleted!")
-            return False
+            return False, 1
     
         # Create a Deviation object to fill with data.
         try:
@@ -574,35 +602,35 @@ class DeviantartScraper():
         except Exception as e:
             logger.error("Failed to generate Deviation object from web page data!")
             logger.error(e)
-            return False
+            return False, 1
     
         # Determine Deviation type.
         media_type = self.determineDeviationMediaType(deviation)
     
         # Scrape the Deviation's initial metadata.
         if not deviation.fetchMetadata(media_type):
-            return False
+            return False, 1
         # Record the URL the scraper was given.
         deviation.metadata["url"] = str(url)
     
         # Create a new directory to save the Deviation to.
         dir_path = self.generateDeviationDirectory(deviation)
         if dir_path == False:
-            return False
+            return False, 1
     
         # Download the Deviation and author comments.
         if media_type == False:
-            return False
+            return False, 1
         else:
             deviation.metadata["post_type"] = media_type
         if not self.downloadDeviation(deviation, dir_path, SCREENSHOT):
             # Delete the post's archive directory.
             logger.debug("Deleting the incomplete archive directory...")
             shutil.rmtree(dir_path)
-            return False
+            return False, 1
         
         time.sleep(2 + 2 * random.random())
-        return True
+        return True, 1
         
     
 

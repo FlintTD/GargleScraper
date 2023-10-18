@@ -36,7 +36,7 @@ class TwitterScraper():
         # Set up Chromedriver.
         # Old Chromedriver without undetected-chromedriver
         chrome_options = Options()
-        chrome_options.add_argument(f"user-data-dir={os.path.join(self.working_dir, '/CustomChromeProfile')}")
+        chrome_options.add_argument(f"--user-data-dir={os.path.join(self.working_dir, 'CustomChromeProfile')}")
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging']) #This makes the "DevTools listening on ws://127.0.0.1" message go away.
         self.driver = webdriver.Chrome(
             #service = Service(executable_path = os.path.join(os.getcwd(), 'chromedriver')),
