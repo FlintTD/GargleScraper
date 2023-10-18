@@ -53,16 +53,19 @@ class TwitterScraper():
         logger.info("The Twitter scraper is opening a browser window...")
         # Load www.twitter.com in a web browser.
         self.driver.get("http://www.twitter.com")
-        # Wait until the title of the page includes the word "Twitter".
-        dummy = self.wait.until(EC.title_contains("Home / X"))
+        # Wait until the title of the page includes the "/ X" suffix.
+        dummy = self.wait.until(EC.title_contains("/ X"))
 
     
     def login(self):
         # Check if logging in to Twitter is necessary.
+        accountButton = None
         try:
             # Check if we are already logged in
             # Does the web page have an Account button?
             accountButton = self.wait.until(EC.presence_of_element_located((By.XPATH, "//div[@aria-label='Account menu']")))
+        except:
+            logger.debug("The scraper is not logged in to Twitter. Logging in...")
         finally:
             # If Home header isn't found, logging in to Twitter is necessary.
             if accountButton is None:
@@ -71,6 +74,7 @@ class TwitterScraper():
                 # Wait until the Login page loads.
                 unusedLogInTitle = self.wait.until(EC.title_contains("Log in"))
                 # Enter the login email.
+                time.sleep(0.5)
                 emailTextBox = self.driver.find_element(By.NAME, "text")
                 emailTextBox.send_keys(self.email)
                 emailTextBox.send_keys(Keys.RETURN)
@@ -84,6 +88,8 @@ class TwitterScraper():
                     verificationTextBox.send_keys(self.username)
                     verificationTextBox.send_keys(Keys.RETURN)
                     logger.debug("Verified!")
+                except:
+                    logger.debug("Twitter did not ask for username verification.")
                 finally:
                     # Enter the login password.
                     self.wait.until(EC.visibility_of_element_located((By.NAME, "password")))
@@ -93,6 +99,7 @@ class TwitterScraper():
                 
                 # Wait until the Home page loads.
                 unusedHomeTitle = self.wait.until(EC.title_contains("Home"))
+                logger.debug("The scraper is now logged in to Twitter!")
         time.sleep(1)
     
     
