@@ -148,7 +148,7 @@ def main(argv):
                 if "label" in options:
                     GMAIL_LABEL = options["label"]
                 if "twitter limit" in options:
-                    TWITTER_LIMIT = options["twitter limit"]
+                    TWITTER_LIMIT = int(options["twitter limit"])
                 if "deviantart limit" in options:
                     DEVIANTART_LIMIT = options["deviantart limit"]
     

@@ -48,7 +48,8 @@ class DeviantartScraper():
         #user_data_dir = os.path.normpath(tempfile.mkdtemp())
         user_data_dir = os.path.join(self.working_dir, 'CustomChromeProfile')
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
-            
+        
+        # Initialize Chromedriver.
         self.driver = secretdriver.Chrome(
             executable_path = os.path.join(os.getcwd(), 'chromedriver'),
             options = chrome_options
