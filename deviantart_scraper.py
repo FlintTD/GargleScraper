@@ -188,25 +188,40 @@ class DeviantartScraper():
             logger.error(e)
     
     
+    def sanitizeString(self, string):
+        disallowed_characters = ['#','%','&','{','}','\\','<','>','*','?','/',' ','$','!','\'','\"',':','.','@','+','`','|','=', '\n']
+        return "".join(map(lambda c: c if c not in disallowed_characters else "_", string))
+        #return "".join(filter(lambda char: char not in disallowed_characters, string))
+    
+    
     # TODO
     def isDeviationDeleted(self):
         deleted = False
         return deleted
+        
+    
+    def isDeviantartGallery(self, url):
+        match = re.match('https?://www.deviantart.com\/[^\s\/]*\/gallery\/[\d]*\/', url)
+        if match is None:
+            return False
+        else:
+            return True
     
     
-    def sanitizeString(self, string):
-        disallowed_characters = ['#','%','&','{','}','\\','<','>','*','?','/',' ','$','!','\'','\"',':','.','@','+','`','|','=', '\n']
-        return "".join(filter(lambda char: char not in disallowed_characters , string))
-    
-    
-    # Generates a new directory containing the data from a Deviation.
+    # Generates a new directory for containing the archive of a Deviation or gallery of Deviations.
     # Returns False, or a path to the archive directory it has created.
     def generateDeviationDirectory(self, deviation):
-        # Generate download directory name.
-        datestring = deviation.metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-        sanitized_id = self.sanitizeString(deviation.metadata["title"])
-        dir_name = datestring + "__" + sanitized_id[0:16]
-        path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(deviation.metadata["author"].lower(), dir_name))
+        if "series" in deviation.metadata.keys():
+        # Generate gallery download directory name.
+            sanitized_id = self.sanitizeString(deviation.metadata["series"])
+            dir_name = sanitized_id
+            path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(deviation.metadata["author"].lower(), dir_name))
+        else:
+        # Generate Deviation download directory name.
+            datestring = deviation.metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+            sanitized_id = self.sanitizeString(deviation.metadata["title"])
+            dir_name = datestring + "__" + sanitized_id[0:16]
+            path_to_download_dir = os.path.join(self.path_to_archive, os.path.join(deviation.metadata["author"].lower(), dir_name))
         
         # If the directory already exists, but the Deviation is not downloaded (Gargle Scraper checks before this point), don't make a new directory.
         if not os.path.exists(path_to_download_dir):
@@ -280,30 +295,32 @@ class DeviantartScraper():
                     text_list.append(element.find_element(By.TAG_NAME, "span").text)
             except:
                 text_list.append(deviation_text.text)
-        
-        # Scrape the author's comments.
-            comments_list = []
-            comments_list.append(author_comments.text)
-            html_comment = author_comments.get_attribute('innerHTML')
             
         # Sanitize the text from the Deviation.
             text = "\n".join(text_list)
         
-        # Sanitize the author's comments.
-            markdown_comment = markdownify.markdownify(html_comment, heading_style="ATX")
-            
-            datestring = deviation.metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-            sanitized_title = self.sanitizeString(deviation.metadata["title"])
-            
         # Try to save the Deviation's text.
             filename = f"{sanitized_title}__{datestring}"
             with open(os.path.join(archive_path, (filename + ".txt")), 'w', encoding="utf-8") as file:
                 file.write(text)
-            
-        # Try to save the author comments.
-            filename = f"{sanitized_title}__comments__{datestring}"
-            with open(os.path.join(archive_path, (filename + ".md")), 'w', encoding="utf-8") as file:
-                file.write(markdown_comment)
+        
+        # Scrape and archive the author's comments in a separate file.
+            if author_comments != None:
+            # Scrape the author's comments.
+                html_comment = author_comments.get_attribute('innerHTML')
+        
+            # Sanitize the author's comments.
+                markdown_comment = markdownify.markdownify(html_comment, heading_style="ATX")
+                
+                datestring = deviation.metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+                sanitized_title = self.sanitizeString(deviation.metadata["title"])
+                
+            # Try to save the author comments.
+                filename = f"{sanitized_title}__comments__{datestring}"
+                with open(os.path.join(archive_path, (filename + ".md")), 'w', encoding="utf-8") as file:
+                    file.write(markdown_comment)
+            else:
+                logger.debug("No author comments found for this deviation.")
         
         #Try to save the Deviation's metadata.
             self.downloadMetadata(deviation, archive_path)
@@ -534,24 +551,24 @@ class DeviantartScraper():
                         logger.error(e)
                         return(False)
         
-        # Scrape the author's comments.
-            # There are actually two near-identical "legacy-journal" elements, one for the text body and one for the author comments.
-            #author_comments = deviation.main.find_element(By.ID, "description")
-            comments_list = []
-            comments_list.append(author_comments.text)
-            html_comment = author_comments.get_attribute('innerHTML')
+        # Scrape and archive the author's comments in a separate file.
+            if author_comments != None:
+            # Scrape the author's comments.
+                html_comment = author_comments.get_attribute('innerHTML')
         
-        # Sanitize the author's comments.
-            markdown_comment = markdownify.markdownify(html_comment, heading_style="ATX")
-            
-            datestring = deviation.metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
-            sanitized_title = self.sanitizeString(deviation.metadata["title"])
-            
-        # Try to save the author comments.
-            filename = f"{sanitized_title}__comments__{datestring}"
-            with open(os.path.join(archive_path, (filename + ".md")), 'w', encoding="utf-8") as file:
-                file.write(markdown_comment)
-        
+            # Sanitize the author's comments.
+                markdown_comment = markdownify.markdownify(html_comment, heading_style="ATX")
+                
+                datestring = deviation.metadata["date"].strftime('%Y-%m-%d_%H-%M-%S')
+                sanitized_title = self.sanitizeString(deviation.metadata["title"])
+                
+            # Try to save the author comments.
+                filename = f"{sanitized_title}__comments__{datestring}"
+                with open(os.path.join(archive_path, (filename + ".md")), 'w', encoding="utf-8") as file:
+                    file.write(markdown_comment)
+            else:
+                logger.debug("No author comments found for this deviation.")
+                
         #Try to save the Deviation's metadata.
             self.downloadMetadata(deviation, archive_path)
         
@@ -587,51 +604,119 @@ class DeviantartScraper():
     
     
     # Download the full data and metadata of a Deviation.
-    # Returns one value:
+    # Returns two values:
     #     True or False boolean, indicating a successful scrape or not.
-    def scrapeFromDeviantart(self, url, SCREENSHOT):
+    #     Integer, indicating how many deviations were viewed.
+    def scrapeFromDeviantart(self, url, SCREENSHOT, gallery_data=[]):
         # Navigate to the requested page on DeviantArt.
         self.goToPage(url)
         # Check to see if the Deviation has been deleted.
         if self.isDeviationDeleted():
             logger.warning("  This Deviation from DeviantArt has been deleted!")
-            return False, 1
-    
-        # Create a Deviation object to fill with data.
-        try:
-            deviation = Deviation(self.driver.find_element(By.TAG_NAME, "main"))
-        except Exception as e:
-            logger.error("Failed to generate Deviation object from web page data!")
-            logger.error(e)
-            return False, 1
-    
-        # Determine Deviation type.
-        media_type = self.determineDeviationMediaType(deviation)
-    
-        # Scrape the Deviation's initial metadata.
-        if not deviation.fetchMetadata(media_type):
-            return False, 1
-        # Record the URL the scraper was given.
-        deviation.metadata["url"] = str(url)
-    
-        # Create a new directory to save the Deviation to.
-        dir_path = self.generateDeviationDirectory(deviation)
-        if dir_path == False:
-            return False, 1
-    
-        # Download the Deviation and author comments.
-        if media_type == False:
-            return False, 1
-        else:
-            deviation.metadata["post_type"] = media_type
-        if not self.downloadDeviation(deviation, dir_path, SCREENSHOT):
-            # Delete the post's archive directory.
-            logger.debug("Deleting the incomplete archive directory...")
-            shutil.rmtree(dir_path)
-            return False, 1
+            return False, 1, 0
         
-        time.sleep(2 + 2 * random.random())
-        return True, 1
+        # Check if the URL is a DeviantArt gallery or a single Deviation.
+        if self.isDeviantartGallery(url):
+            # Try to find the gallery title.
+            try:
+                gallery_div = self.driver.find_element(By.ID, "sub-folder-gallery")
+                gallery_title = gallery_div.find_element(By.XPATH, "//div[@role='button']/div[1]").get_attribute("innerHTML").split('<')[0]
+                logger.debug("DeviantArt gallery title: " + gallery_title)
+            except Exception as e:
+                logger.error("Failed to locate DeviantArt gallery title!")
+                logger.error(e)
+                return False, 1, 0
+            
+            # Try to compile a list containing a URL to each work in the gallery.
+            try:
+                galleryElementList = gallery_div.find_elements(By.XPATH, "./div/div[3]//a[@data-hook='deviation_link']")
+                gallery_list = []
+                for element in galleryElementList:
+                    url_string = element.get_attribute('href')
+                    if url_string not in gallery_list:
+                        gallery_list.append(url_string)
+            except Exception as e:
+                logger.error("Failed to gather list of deviations in the gallery!")
+                logger.error(e)
+                return False, 1, 0
+            
+            if gallery_list == []:
+                logger.error("Failed to gather list of deviations in the gallery!")
+                return False, 1, 0
+            
+            # Go through the gallery one by one.
+            logger.debug("Scraping DeviantArt Gallery...")
+            total_passed = False
+            total_pages = 0
+            additional_pages = len(gallery_list) - 1
+            for deviation_url in gallery_list:
+                passed, pages, unused = self.scrapeFromDeviantart(deviation_url, SCREENSHOT, [url, gallery_title])
+                total_passed = passed
+                total_pages += pages
+            
+            return total_passed, total_pages, additional_pages
+            
+        else:
+            # Navigate to the requested page on DeviantArt.
+            self.goToPage(url)
+            
+            # Check to see if the Deviation has been deleted.
+            if self.isDeviationDeleted():
+                logger.warning("  This Deviation from DeviantArt has been deleted!")
+                return False, 1, 0
+            
+            # Create a Deviation object to fill with data.
+            try:
+                deviation = Deviation(self.driver.find_element(By.TAG_NAME, "main"))
+            except Exception as e:
+                logger.error("Failed to generate Deviation object from web page data!")
+                logger.error(e)
+                return False, 1, 0
+            
+            # Determine Deviation type.
+            media_type = self.determineDeviationMediaType(deviation)
+        
+            # Scrape the Deviation's initial metadata.
+            if not deviation.fetchMetadata(media_type):
+                return False, 1, 0
+            
+            # Record the URL the scraper was given.
+            deviation.metadata["url"] = str(url)
+            
+            # If this deviation is part of a gallery, put the gallery name into the metadata.
+            if gallery_data != []:
+                deviation.metadata["series_url"] = gallery_data[0]
+                deviation.metadata["series"] = gallery_data[1]
+                
+            
+            # Create a new directory to save the Deviation to, if needed.
+            dir_path = self.generateDeviationDirectory(deviation)
+            if dir_path == False:
+                return False, 1, 0
+            
+            # Check if this deviation has already been scraped.
+            metadata_files = [file_name for file_name in os.listdir(dir_path) if file_name.endswith('metadata.json')]
+            for file in metadata_files:
+                with open(os.path.join(dir_path, file)) as json_metadata:
+                    metadata_directory = json.load(json_metadata)
+                    if url == metadata_directory["url"]:
+                        logger.debug("This deviation has already been scraped! Moving on.")
+                        return True, 1, 0
+                        
+            
+            # Download the Deviation and author comments.
+            if media_type == False:
+                return False, 1, 0
+            else:
+                deviation.metadata["post_type"] = media_type
+            if (not self.downloadDeviation(deviation, dir_path, SCREENSHOT)) and (len(os.listdir(dir_path)) < 1):
+                # Delete the post's archive directory, unless it's a gallery containing at least one other archived work.
+                logger.debug("Deleting the incomplete archive directory...")
+                shutil.rmtree(dir_path)
+                return False, 1, 0
+            
+            time.sleep(2 + 2 * random.random())
+        return True, 1, 0
         
     
 

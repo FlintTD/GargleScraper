@@ -363,18 +363,20 @@ def main(argv):
                             d_scraper.login()
                             
                         # Scrape the DeviantArt post.
-                        success, additional_posts_viewed = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
+                        success, additional_posts_viewed, additional_posts = d_scraper.scrapeFromDeviantart(url, SCREENSHOT)
                         POSTS_VIEWED += additional_posts_viewed
                         DEVIATIONS_VIEWED += additional_posts_viewed
+                        total_posts += additional_posts
                         if success:
-                            logger.info("DeviantArt scraper has archived the post!")
-                            post_count += 1
+                            logger.info("DeviantArt scraper has archived the URL!")
+                            post_count += additional_posts_viewed
                         else:
-                            logger.error("DeviantArt scraper failed to archive the post!")
-                            logger.error("Post at: " + url)
-                            failed_scrapes += 1
+                            logger.error("DeviantArt scraper failed to archive the URL!")
+                            logger.error("URL at: " + url)
+                            logger.error("If this URL looks like a gallery, this error may be an incomplete gallery scrape!")
+                            failed_scrapes += additional_posts_viewed
                     else:
-                        logger.info("This Deviation has already been scraped and archived!")
+                        logger.info("This Deviation or gallery has already been scraped and archived!")
                         post_count += 1
             
             # -------- Anything Else --------
