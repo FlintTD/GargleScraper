@@ -716,14 +716,6 @@ class DeviantartScraper():
             return total_passed, total_pages, additional_pages
             
         else:
-            # Navigate to the requested page on DeviantArt.
-            self.goToPage(url)
-            
-            # Check to see if the Deviation has been deleted.
-            if self.isDeviationDeleted():
-                logger.warning("  This Deviation from DeviantArt has been deleted!")
-                return False, 1, 0
-            
             # Create a Deviation object to fill with data.
             try:
                 deviation = Deviation(self.driver.find_element(By.TAG_NAME, "main"))
