@@ -103,6 +103,7 @@ class DeviantartScraper():
             time.sleep(1 + 1.5 * random.random())
             username_textbox = self.driver.find_element(By.XPATH, "//input[@name='username']")
             self.mimicTyping(username_textbox, self.username)
+            username_textbox.send_keys(Keys.RETURN)
             time.sleep((1 + 1.5 * random.random()))
             # Enter the login password.
             password_textbox = self.driver.find_element(By.XPATH, "//input[@name='password']")
@@ -167,13 +168,23 @@ class DeviantartScraper():
         time.sleep(0.5 + 1.5 * random.random())
     
     
+    def scrollToElement(self, element):
+        try:
+            self.driver.execute_script("return arguments[0].scrollIntoView(true);", element)  # Scroll to web element
+            #ActionChains(self.driver).move_to_element(element).perform()  # Scroll to web element
+            self.wait.until(EC.visibility_of(element))
+            logger.debug("Scrolled to element.")
+        except Exception as e:
+            logger.error("Error scrolling to web element!")
+            logger.error(e)
+    
+    
     def screenshot(self, element, dir_path, screenshot_name):
         try:
-            ActionChains(self.driver).scroll_to_element(element).perform()  # focus
+            self.scrollToElement(element)
             location = element.location
             logger.debug("Taking screenshot of element at screen coordinates: " + str(location))
             size = element.size
-            self.wait.until(EC.visibility_of(element))
             png = self.driver.get_screenshot_as_png()
             im = Image.open(io.BytesIO(png))
             left = location['x']
@@ -201,10 +212,12 @@ class DeviantartScraper():
         
     
     def isDeviantartGallery(self, url):
-        match = re.match('https?://www.deviantart.com\/[^\s\/]*\/gallery\/[\d]*\/', url)
+        match = re.match('https?:\/\/www.deviantart.com\/[^\s]*\/gallery\/[^\s]*', url)
         if match is None:
+            logger.debug("Identified this DeviantArt URL as a single deviation!")
             return False
         else:
+            logger.debug("Identified this DeviantArt URL as a gallery of deviations!")
             return True
     
     
@@ -233,19 +246,22 @@ class DeviantartScraper():
     
     def determineDeviationMediaType(self, deviation):
         try:
-            art_stage = deviation.main.find_element(By.XPATH, ".//div[@data-hook='art_stage']")
+            art_stage = deviation.main.find_element(By.XPATH, "//div[1]")
             # Is it a video?
             try:
                 art_stage.find_element(By.XPATH, ".//section[@data-hook='react_playable']")
+                logger.debug("Deviation identified as a video.")
                 logger.error("Video deviations are not yet suported for archival from DeviantArt!")
             except:
                 pass
             # Is it an image?
             try:
-                art_stage.find_element(By.TAG_NAME, "img")
+                art_stage.find_element(By.XPATH, "//div[@typeof='ImageObject']")
+                logger.debug("Deviation identified as an image.")
                 return "image"
             except:
                 # It must be text.
+                logger.debug("Deviation identified as text.")
                 return "text"
                 
         except Exception as e:
@@ -346,8 +362,9 @@ class DeviantartScraper():
         try:
         # Try to locate the deviation's size text.
         # The number of divs in the deviation's information block can change by one, depending on if tags are used or not.
-            deviation_author_block = deviation.main.find_element(By.XPATH, ".//div[@data-hook='deviation_meta']")
-            deviation_information_blocks = deviation_author_block.find_elements(By.XPATH, "../div")
+            deviation_information_blocks = deviation.main.find_elements(By.XPATH, "./div/div[2]/div/div")
+            logger.debug("Found the deviation's information blocks!")
+            logger.debug("Found " + str(len(deviation_information_blocks)) + " info blocks!")
         except Exception as e:
             logger.error("Failed to find the deviation's matadata information blocks!")
             logger.error(e)
@@ -386,7 +403,8 @@ class DeviantartScraper():
                     pass
             # This finds the deviation's size data string.
                 try:
-                    deviation_size_data_string = info_block.find_element(By.XPATH, "./div/div/div/div/div/div[2]").text
+                    deviation_size_data_string = info_block.find_element(By.XPATH, "./div[1]/div[1]/div[1]/div[1]/div[1]/div[2]").text
+                    logger.debug("Deviation size data string: " + str(deviation_size_data_string))
                 except:
                     pass
             
@@ -394,6 +412,8 @@ class DeviantartScraper():
                 logger.error("Failed to find the HTML location of the deviation's size data text within the size-data block!")
                 logger.error("DeviantArt probably shuffled their divs around again!")
                 raise Exception("Deviation size data string was not found in web page!")
+            else:
+                logger.info("The deviation's size data string: " + str(deviation_size_data_string))
             
         except Exception as e:
             logger.error("Failed to find the deviation's size-data block!")
@@ -491,8 +511,12 @@ class DeviantartScraper():
                         # Determine image type.
                         image_type = image_filename.split('.')[1]
                         # Save the image to a file.
+                        url_ized_name = re.sub("\W", "_", deviation.metadata["title"].lower())
+                        guessed_original_name = url_ized_name + "_by_" + deviation.metadata["author"].lower()
+                        image_filename = re.sub('[\w\d]{7}-[\w\d]{8}-[\w\d]{4}-[\w\d]{4}-[\w\d]{4}-[\w\d]{12}', guessed_original_name, image_filename)
                         with open(os.path.join(archive_path, image_filename), 'wb') as file:
                             image.save(file)
+                            logger.debug("Saved deviation image as: " + image_filename)
                     except Exception as e:
                         logger.error("Error downloading low-rez image from DeviantArt!")
                         logger.error(e)
@@ -621,6 +645,7 @@ class DeviantartScraper():
             try:
                 gallery_div = self.driver.find_element(By.ID, "sub-folder-gallery")
                 gallery_title = gallery_div.find_element(By.XPATH, "//div[@role='button']/div[1]").get_attribute("innerHTML").split('<')[0]
+                gallery_deviation_count = int(gallery_div.find_element(By.XPATH, "//div[@role='button']/div[1]/span").text)
                 logger.debug("DeviantArt gallery title: " + gallery_title)
             except Exception as e:
                 logger.error("Failed to locate DeviantArt gallery title!")
@@ -629,23 +654,57 @@ class DeviantartScraper():
             
             # Try to compile a list containing a URL to each work in the gallery.
             try:
-                galleryElementList = gallery_div.find_elements(By.XPATH, "./div/div[3]//a[@data-hook='deviation_link']")
                 gallery_list = []
-                for element in galleryElementList:
-                    url_string = element.get_attribute('href')
-                    if url_string not in gallery_list:
-                        gallery_list.append(url_string)
+                gallery_content_row_list = []
+                # Scroll to the bottom of the gallery over time, to load every deviation.
+                row = 0
+                last_scroll_height = 0
+                scrolled_to_bottom = False
+                while scrolled_to_bottom == False:
+                    gallery_content_row_list = gallery_div.find_elements(By.XPATH, ".//div[@data-testid='content_row']")
+                    
+                    # Go through the full gallery to get every deviation URL.
+                    for gallery_content_row in gallery_content_row_list:
+                        deviation_anchors = gallery_content_row.find_elements(By.XPATH, ".//a[@aria-label]")
+                        for deviation_anchor in deviation_anchors:
+                            url_string = deviation_anchor.get_attribute('href')
+                            if url_string not in gallery_list:
+                                gallery_list.append(url_string)
+                            else:
+                                logger.debug("Found duplicate deviation URL: " + str(url_string))
+                    
+                    # Scroll
+                    self.scrollToElement(gallery_content_row_list[-2])
+                    time.sleep(1)
+                    
+                    # Check to see if we need to keep scrolling.
+                    new_scroll_height = self.driver.execute_script("return document.body.scrollHeight")
+                    if new_scroll_height == last_scroll_height:
+                        scrolled_to_bottom = True
+                    else:
+                        last_scroll_height = new_scroll_height
+                
+                # Check if we've found all of the deviations.
+                if len(gallery_list) < gallery_deviation_count:
+                    logger.warning("Scraper found fewer deviations than the nominal quantity claimed by DeviantArt!")
+                    logger.warning("  Found: " + str(len(gallery_list)))
+                    logger.warning("  Expected: " + str(gallery_deviation_count))
+                    #logger.warning("  Found deviations start with: " + gallery_list[0] + "...")
+                    #logger.warning("  ...and end with: " + gallery_list[-1])
+                    #raise Exception("Scraper found fewer deviations than the nominal quantity claimed by DeviantArt!")
+                logger.info("Found " + str(len(gallery_list)) + " deviations in this gallery!")
+                
             except Exception as e:
-                logger.error("Failed to gather list of deviations in the gallery!")
+                logger.error("Failed to parse the DeviantArt gallery!")
                 logger.error(e)
                 return False, 1, 0
             
             if gallery_list == []:
-                logger.error("Failed to gather list of deviations in the gallery!")
+                logger.error("Failed to find any deviation URLs from the gallery!")
                 return False, 1, 0
             
-            # Go through the gallery one by one.
-            logger.debug("Scraping DeviantArt Gallery...")
+            # Go through the listed deviations one by one.
+            logger.info("Scraping DeviantArt Gallery...")
             total_passed = False
             total_pages = 0
             additional_pages = len(gallery_list) - 1
@@ -737,7 +796,7 @@ class Deviation():
         logger.debug("Fetching Deviation metadata...")
         if media_type == "text":
             try:
-                art_stage = self.main.find_element(By.XPATH, ".//div[@data-hook='art_stage']")
+                art_stage = self.main.find_element(By.XPATH, "//div[1]")
                 # Record the Deviation's title.
                 self.metadata["title"] = art_stage.find_element(By.TAG_NAME, "h1").text
                 # Record the author's handle.
@@ -757,11 +816,11 @@ class Deviation():
                 return False
         else:
             try:
-                title_info_bar = self.main.find_element(By.XPATH, ".//div[@data-hook='deviation_meta']")
+                title_info_bar = self.main.find_element(By.XPATH, "./div/div[2]")
                 # Record the Deviation's title.
-                self.metadata["title"] = title_info_bar.find_element(By.XPATH, ".//h1[@data-hook='deviation_title']").text
+                self.metadata["title"] = title_info_bar.find_element(By.XPATH, ".//h1").text
                 # Record the author's handle.
-                self.metadata["author"] = title_info_bar.find_element(By.XPATH, ".//a[@data-hook='user_link']").get_attribute("data-username")
+                self.metadata["author"] = title_info_bar.find_element(By.XPATH, ".//a").get_attribute("data-username")
                 # Record the time the Deviation was posted.
                 timestring = title_info_bar.find_element(By.TAG_NAME, "time").get_attribute("datetime")
                 datetime_obj = datetime.fromisoformat(timestring)
