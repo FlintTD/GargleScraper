@@ -494,10 +494,12 @@ class DeviantartScraper():
             except:
             # Download the image the unconventional way.
             # If the deviation is older than 2022, there is a good chance it can still be downloaded in full resolution.
+            # I've found Deviations from Dec 3rd 2021 which are fullrez locked as well...
             # This requires a separate method, detailed here: https://gist.github.com/micycle1/735006a338e4bea1a9c06377610886e7
                 logger.debug("Full resolution image deviation unavailable through direct means!")
-                if deviation.metadata["date"] > datetime(2022, 1, 1, tzinfo=timezone.utc):
+                if deviation.metadata["date"] > datetime(2021, 12, 1, tzinfo=timezone.utc):
                 # Try to download the publically-available low-rez version.
+                # TODO: There may be a way to squeeze a bit more resolution out of the image URL, up to 1280p x <native rez>, by tweaking the URL.
                     logger.debug("Downloading the publically-available low-rez image version...")
                     try:
                         image_source_url = deviation_image.get_attribute("src")
